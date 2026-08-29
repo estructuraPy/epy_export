@@ -1,0 +1,72 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "epy_export"
+version = "0.1.0"
+description = "The shared export engine of the ePy document family."
+authors = [{ name = "Ing. Angel Navarro-Mora M.Sc.", email = "ahnavarroitcr@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+classifiers = ["License :: OSI Approved :: MIT License"]
+# Deliberately empty. This library is imported by four applications that
+# each carry their own stack, and by tooling that only wants to read a
+# document's front matter. A caller who wants the PDF stamping or the Qt
+# print plumbing asks for the extra that provides it; the failure when
+# they do not is a named RuntimeError, not an ImportError from a
+# transitive dependency they never chose.
+dependencies = []
+
+[project.optional-dependencies]
+# What each engine actually needs, so a caller pays only for what it uses.
+pdf = ["pypdf>=4.0", "reportlab>=4.0", "Pillow>=10.0"]
+qt = ["PySide6>=6.6"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.5",
+    "pypdf>=4.0",
+    "reportlab>=4.0",
+    "Pillow>=10.0",
+    "PySide6>=6.6",
+]
+
+# NOTE: epy_reports, epy_slides, epy_papers and epy_docs are NOT declared
+# here, in either dependencies or an extra. They are the BACKENDS this
+# library dispatches to, reached by module name at call time and reported
+# absent by name. epy_docs in particular is a commercial, non-PyPI
+# package; naming it in an extra would make `pip install epy_export[docs]`
+# resolve against whatever public index happens to answer -- a
+# dependency-confusion vector. The same reasoning is written into
+# epy_reports' and epy_slides' own pyproject files.
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/epy_export"]
+
+[tool.ruff]
+line-length = 79
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "D", "UP", "B", "SIM"]
+ignore = ["D203", "D213"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# housekeeper.py is generated from _packaging/_tooling/templates/
+# housekeeper_minimal.py. Upstream owns its formatting.
+"housekeeper.py" = ["E501", "D103"]
+"tests/*" = ["D"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-ra -q --strict-markers --strict-config"
+markers = [
+    "slow: needs a real engine, a real render or a display (deselect with -m 'not slow')",
+]
