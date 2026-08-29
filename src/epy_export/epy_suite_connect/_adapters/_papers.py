@@ -14,6 +14,7 @@ from typing import Any
 
 from ..._core._backends import load_backend
 from .._contract._engine import Engine, RenderOptions
+from ._docs import staged_for_latex
 
 __all__ = ["emit", "understands"]
 
@@ -55,6 +56,9 @@ def emit(
             f"default. Pass journal_id."
         )
     module = load_backend(spec.module, why=f"rendering through {spec.label}")
+    # Same reason as the docs adapter: this engine goes through
+    # LaTeX, and LaTeX aborts on the delimiters a model writes.
+    source, _repaired = staged_for_latex(source, target.parent)
     factory: Any = module.Paper
     document: Any = factory.from_file(source)
     document.to_draft(opts.journal_id, target, fmt=fmt)

@@ -88,6 +88,40 @@ def refuse_latex_errors(log_path: Path) -> None:
         )
 
 
+def staged_for_latex(source: Path, output_dir: Path) -> tuple[Path, int]:
+    """Return a copy of ``source`` a LaTeX typesetter can read.
+
+    Measured: the same document that ePy Reports renders in three
+    formats produced NOTHING through the two LaTeX-based engines --
+    "Missing $ inserted", no file -- until 204 math delimiters were
+    rewritten. The engines that need this are the ones that go through
+    LaTeX, and only those; rewriting a source for an engine that
+    already reads it is a change nobody asked for.
+
+    A COPY, never the source. The document the author wrote stays where
+    they put it, and the count comes back so the caller can say how many
+    repairs it needed rather than quietly improving it.
+
+    Args:
+        source: The document to render.
+        output_dir: Where the render is going; the copy is staged there.
+
+    Returns:
+        The path to hand the engine, and how many delimiters moved. Zero
+        means the source was already readable and IS the returned path.
+    """
+    from ..._core._markdown import normalize_math  # noqa: PLC0415
+
+    repair = normalize_math(source.read_text(encoding="utf-8"))
+    if not repair.math_delimiters:
+        return source, 0
+    staged_dir = output_dir / "_staged"
+    staged_dir.mkdir(parents=True, exist_ok=True)
+    staged = staged_dir / source.name
+    staged.write_text(repair.text, encoding="utf-8", newline="\n")
+    return staged, repair.math_delimiters
+
+
 def emit_all(
     spec: Engine,
     source: Path,
@@ -129,6 +163,7 @@ def emit_all(
         RenderFailedError: When LaTeX errored, or a requested file is
             not on disk afterwards.
     """
+    source, _repaired = staged_for_latex(source, output_dir)
     docs = load_backend(spec.module, why=f"rendering through {spec.label}")
     writer_factory: Any = docs.DocumentWriter
     writer: Any = writer_factory(
