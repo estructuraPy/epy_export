@@ -42,6 +42,22 @@ from ._core._frontmatter import (
     set_metadata_field,
     strip_front_matter,
 )
+from ._core._pdf_stamp import (
+    add_footer,
+    add_header,
+    add_metadata,
+    add_page_background,
+    add_watermark,
+    extract_anchor_pages,
+    scale_pages_to_width,
+)
+from ._core._qt_print import (
+    eval_js,
+    print_to_pdf,
+    pump,
+    remove_temp,
+    wait_until,
+)
 from ._core._runtime import pin_system_icu
 from .epy_suite_connect._adapters._adapter import (
     available,
@@ -68,17 +84,29 @@ __all__ = [
     "EngineUnavailableError",
     "RenderFailedError",
     "RenderOptions",
+    "add_footer",
+    "add_header",
+    "add_metadata",
+    "add_page_background",
+    "add_watermark",
     "available",
     "backend_present",
     "engine",
     "engine_ids",
+    "eval_js",
+    "extract_anchor_pages",
     "installed",
     "load_backend",
     "parse_front_matter",
     "parse_header_cells",
     "pin_system_icu",
+    "print_to_pdf",
+    "pump",
+    "remove_temp",
     "render",
+    "scale_pages_to_width",
     "set_metadata_field",
     "strip_front_matter",
     "understood_by",
+    "wait_until",
 ]
