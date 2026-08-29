@@ -64,3 +64,23 @@ def test_the_two_failures_are_different_types() -> None:
     assert not issubclass(
         _backends.BackendUnavailableError, _backends.RenderFailedError
     )
+
+
+def test_the_engine_name_and_the_backend_name_are_one_condition() -> None:
+    # They were two classes for one fact, and a consumer's test proved
+    # why that is a defect: it asked for EngineUnavailableError and got
+    # BackendUnavailableError, raised two frames deeper. A caller cannot
+    # know which of two names to catch, so it catches one and the other
+    # escapes.
+    from epy_export import BackendUnavailableError, EngineUnavailableError
+
+    assert EngineUnavailableError is BackendUnavailableError
+
+
+def test_a_render_failure_is_still_a_different_condition() -> None:
+    # The control for the merge above. Collapsing every error into one
+    # name would satisfy that test too, and would undo the split that
+    # stopped a truncated PDF being reported as "not installed".
+    from epy_export import BackendUnavailableError, RenderFailedError
+
+    assert RenderFailedError is not BackendUnavailableError

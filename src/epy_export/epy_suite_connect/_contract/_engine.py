@@ -11,6 +11,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from ..._core._backends import BackendUnavailableError
+
 __all__ = [
     "APPEARANCES",
     "Engine",
@@ -38,13 +40,17 @@ this copy.
 """
 
 
-class EngineUnavailableError(RuntimeError):
-    """The chosen engine is not installed.
-
-    Distinct from a render that ran and failed. Kept as its own name
-    rather than folded into the backend error because the caller's
-    recovery differs: this one is fixed by installing something.
-    """
+# One condition, one name. "The engine is not installed" and "the
+# backend could not be loaded" are the same fact, and giving it two
+# classes is exactly the duplication this library exists to end -- a
+# caller cannot know which of the two to catch, so it catches one and
+# the other escapes. Measured: a consumer's test asked for
+# EngineUnavailableError and got BackendUnavailableError from a code
+# path two frames deeper.
+#
+# The alias is kept because "engine" is the word this layer speaks in,
+# and the dispatcher's message says which ENGINE is missing.
+EngineUnavailableError = BackendUnavailableError
 
 
 @dataclass(frozen=True)
