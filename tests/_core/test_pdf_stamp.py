@@ -167,3 +167,70 @@ def test_the_metadata_written_is_the_metadata_asked_for(
     assert info.title == "Título"
     assert info.author == "ANM"
     assert info["/Creator"] == "epy_export"
+
+
+# --- named destinations, the real thing -------------------------------
+#
+# Moved here from epy_slides, which owned the only test of a function it
+# does not use: extract_anchor_pages had zero callers in its src/ and
+# lived entirely on the strength of this test. Deleting it with the
+# module would have lost real coverage; the function's home is here now,
+# and so is its test.
+#
+# It also supplies what the outline fixture above could not. reportlab
+# writes no /Names /Dests tree, but pypdf's add_named_destination does --
+# so this is the invariant the module docstring is actually about,
+# asserted against a document that genuinely carries one.
+
+
+@pytest.fixture
+def destination_pdf(tmp_path: Path) -> Path:
+    """A two-page PDF carrying a real named destination."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+
+    source = tmp_path / "src.pdf"
+    pdf = canvas.Canvas(str(source), pagesize=A4)
+    for number in (1, 2):
+        pdf.drawString(72, 720, f"page {number}")
+        pdf.showPage()
+    pdf.save()
+
+    out = tmp_path / "named.pdf"
+    writer = pypdf.PdfWriter()
+    for page in pypdf.PdfReader(str(source)).pages:
+        writer.add_page(page)
+    writer.add_named_destination("intro", page_number=1)
+    with out.open("wb") as handle:
+        writer.write(handle)
+    return out
+
+
+def test_anchor_pages_are_read_one_based(destination_pdf: Path) -> None:
+    anchors = _pdf_stamp.extract_anchor_pages(destination_pdf)
+    assert anchors.get("intro") == 2
+
+
+def test_the_fixture_really_carries_a_named_destination(
+    destination_pdf: Path,
+) -> None:
+    # The control. The outline tests above exist because reportlab alone
+    # produces none of these, and a fixture with an empty destination set
+    # lets every stamper pass by comparing nothing to nothing.
+    assert set(pypdf.PdfReader(str(destination_pdf)).named_destinations) == {
+        "intro"
+    }
+
+
+def test_stamping_keeps_a_real_named_destination(
+    destination_pdf: Path, stamp_png: Path
+) -> None:
+    # The claim the module docstring makes, against a document that has
+    # what the docstring is talking about.
+    before = set(pypdf.PdfReader(str(destination_pdf)).named_destinations)
+    _pdf_stamp.add_watermark(destination_pdf, stamp_png)
+    _pdf_stamp.add_metadata(
+        destination_pdf, creator="epy_export", producer="epy_export"
+    )
+    after = set(pypdf.PdfReader(str(destination_pdf)).named_destinations)
+    assert after == before == {"intro"}
