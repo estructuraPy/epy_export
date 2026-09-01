@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import sys
+import warnings
 from pathlib import Path
 
 __all__ = ["pin_system_icu"]
@@ -33,7 +34,22 @@ def pin_system_icu() -> None:
     Preloading the System32 copy by full path pins the module name so Qt
     resolves against the right ICU. No-op off Windows, when the system DLL
     is absent, or when ICU is already loaded.
+
+    If ``PySide6.QtCore`` is already in :data:`sys.modules`, Qt has already
+    loaded ICU and the pin cannot take effect; the function emits a
+    :class:`RuntimeWarning` and returns, because after Qt loads there is no
+    way to change the binding. Callers must import the epy package before
+    any ``PySide6`` import so the pin runs first.
     """
+    if "PySide6.QtCore" in sys.modules:
+        warnings.warn(
+            "pin_system_icu() ran after Qt was already imported, the pin has "
+            "no effect once Qt has loaded, and the caller should import the "
+            "epy package before any PySide6 import.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return
     if sys.platform != "win32":
         return
     import ctypes  # noqa: PLC0415
