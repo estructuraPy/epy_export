@@ -36,6 +36,7 @@ from ._core._backends import (
     backend_present,
     load_backend,
 )
+from ._core._files import write_text_atomic
 from ._core._frontmatter import (
     parse_front_matter,
     parse_header_cells,
@@ -109,4 +110,5 @@ __all__ = [
     "strip_front_matter",
     "understood_by",
     "wait_until",
+    "write_text_atomic",
 ]

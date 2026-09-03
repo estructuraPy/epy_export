@@ -8,3 +8,6 @@ dist/
 .coverage
 htmlcov/
 .venv/
+
+# loop-deep snapshots: revertible copies written before a delegated edit.
+.deepseek_delegate/
