@@ -43,6 +43,7 @@ from ._core._frontmatter import (
     set_metadata_field,
     strip_front_matter,
 )
+from ._core._identity import LEGACY_ORGANIZATIONS, ORGANIZATION
 from ._core._pdf_stamp import (
     add_footer,
     add_header,
@@ -83,6 +84,8 @@ __all__ = [
     "ENGINES",
     "Engine",
     "EngineUnavailableError",
+    "LEGACY_ORGANIZATIONS",
+    "ORGANIZATION",
     "RenderFailedError",
     "RenderOptions",
     "add_footer",
