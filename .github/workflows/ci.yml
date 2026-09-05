@@ -1,0 +1,138 @@
+# CI - epy_export (public, MIT).
+# The shared engine of the ePy document family. Five applications pin it
+# by tag and install it from this repository, so a change here reaches
+# all of them at once: this is the one repository in the family whose CI
+# is not about itself.
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*.*.*"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install "ruff>=0.5"
+      - name: ruff check
+        run: ruff check .
+
+  typecheck:
+    name: Typecheck (pyright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Every extra, not just dev: pyright resolves imports against what
+      # is installed, and this tree imports pypdf, reportlab, Pillow and
+      # PySide6 behind extras. With a thinner install the job would fail
+      # on unresolved imports that are not type errors at all.
+      - name: Install package + every extra
+        run: pip install -e ".[dev,pdf,qt]"
+      - name: Install pyright
+        run: npm install -g pyright
+      # pyrightconfig.json pins pythonPlatform to Windows so this job and
+      # a developer's local run evaluate the same configuration.
+      - name: pyright
+        run: pyright
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    needs: [lint]
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # The Qt print path is tested against a fake page, but importing
+      # PySide6 at all needs these on a headless runner.
+      - name: Install Qt runtime libraries (headless)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libdbus-1-3
+      - name: Install package + dev deps
+        run: pip install -e ".[dev]"
+      - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: pytest tests/ -q
+
+  consumers:
+    name: The applications still import what they were promised
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package + dev deps
+        run: pip install -e ".[dev,pdf,qt]"
+      # This library is a promise to five applications that pin it by
+      # tag. Removing or renaming a public name is what breaks them, and
+      # it breaks them at THEIR next install, not here -- so the surface
+      # is asserted here, where the change is made.
+      - name: Every promised name is importable
+        run: |
+          python - <<'PY'
+          import epy_export
+
+          promised = {
+              "ORGANIZATION", "LEGACY_ORGANIZATIONS",
+              "parse_front_matter", "strip_front_matter",
+              "parse_header_cells", "set_metadata_field", "is_truthy",
+              "write_text_atomic", "pin_system_icu",
+              "add_footer", "add_header", "add_metadata",
+              "add_page_background", "add_watermark",
+              "extract_anchor_pages", "scale_pages_to_width",
+              "print_to_pdf", "eval_js", "wait_until", "pump",
+              "remove_temp", "render", "available", "installed",
+              "understood_by", "engine", "engine_ids", "ENGINES",
+              "APPEARANCES", "Engine", "RenderOptions",
+              "EngineUnavailableError", "BackendUnavailableError",
+              "RenderFailedError", "backend_present", "load_backend",
+          }
+          missing = sorted(n for n in promised if not hasattr(epy_export, n))
+          assert not missing, f"names the applications import are gone: {missing}"
+          undeclared = sorted(promised - set(epy_export.__all__))
+          assert not undeclared, f"promised but not in __all__: {undeclared}"
+          print(f"{len(promised)} promised names present and declared")
+          PY
+
+  build:
+    name: Build distribution
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build
+        run: pip install build
+      - name: Build sdist + wheel
+        run: pyproject-build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
