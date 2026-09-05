@@ -4,6 +4,26 @@ All notable changes to epy_export are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-09-05
+
+### Added
+- **`is_truthy`**, the front-matter truth test the two editors each kept
+  their own copy of. They differed only in how much of the rule their
+  docstring wrote down; the accepted spellings were already identical,
+  which is the shape a duplicate takes just before the two drift.
+
+### Fixed
+- **`extract_anchor_pages` raised on a PDF it promised to survive.** It
+  added one to whatever pypdf answered for a destination's page number,
+  and pypdf answers None for a destination it cannot place -- so a single
+  unplaceable anchor raised TypeError inside the helper whose contract is
+  "returns an empty dict rather than failing". Unplaceable anchors are
+  skipped now.
+
+### Changed
+- A pinned pyright configuration, so this repository and a developer's
+  local run evaluate the same tree. Zero errors, zero warnings.
+
 ## [0.1.0] — 2026-09-04
 
 ### Added

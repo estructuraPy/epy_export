@@ -76,7 +76,7 @@ from .epy_suite_connect._contract._engine import (
 )
 from .epy_suite_connect._data._catalog import ENGINES, engine, engine_ids
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Ing. Angel Navarro-Mora M.Sc."
 
 __all__ = [
