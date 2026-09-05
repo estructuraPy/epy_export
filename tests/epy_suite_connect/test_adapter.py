@@ -102,11 +102,18 @@ def test_an_absent_engine_is_named_with_what_to_install(
 
 
 def test_papers_refuses_to_invent_a_journal(
-    source: Path, tmp_path: Path
+    source: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Measured: an empty id reaches profile("") and comes back as a bare
     # KeyError: '', which tells the reader nothing about what they did
     # not choose.
+    #
+    # The engine is reported available so the call reaches the adapter
+    # at all. Without that this asserted only that ePy Papers is not
+    # installed -- true on every runner, and nothing to do with the
+    # refusal under test. The adapter validates the journal BEFORE it
+    # loads the backend, so no stand-in for the application is needed.
+    monkeypatch.setattr(_adapter, "available", lambda _id: True)
     with pytest.raises(ValueError, match="journal"):
         render(source, tmp_path, engine_id="papers", formats=("pdf",))
 
