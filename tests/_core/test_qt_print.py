@@ -8,6 +8,7 @@ about budgets, not about Chromium.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -36,10 +37,12 @@ class _FakeApp:
 
 
 class _FakeSignal:
-    def __init__(self) -> None:
-        self.slot = None
+    """Records the one slot a caller connects, and lets it be called."""
 
-    def connect(self, slot: object) -> None:
+    def __init__(self) -> None:
+        self.slot: Callable[..., object] | None = None
+
+    def connect(self, slot: Callable[..., object]) -> None:
         self.slot = slot
 
 

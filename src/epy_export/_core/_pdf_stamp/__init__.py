@@ -107,9 +107,13 @@ def extract_anchor_pages(pdf_path: Path) -> dict[str, int]:
             # Individual destinations may reference a missing page —
             # suppress only the specific lookup errors pypdf raises.
             with contextlib.suppress(KeyError, IndexError, TypeError):
-                result[name.lstrip("/")] = (
-                    reader.get_destination_page_number(dest) + 1
-                )
+                # pypdf answers None for a destination it cannot place;
+                # the anchor is simply unusable, and the caller's second
+                # pass is built to work from whatever survives here.
+                page = reader.get_destination_page_number(dest)
+                if page is None:
+                    continue
+                result[name.lstrip("/")] = page + 1
         return result
     except Exception:  # noqa: BLE001
         # pypdf.PdfReadError (and other internal parse exceptions) are
