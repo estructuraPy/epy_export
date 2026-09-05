@@ -25,6 +25,7 @@ import json
 import re
 
 __all__ = [
+    "is_truthy",
     "parse_front_matter",
     "parse_header_cells",
     "set_metadata_field",
@@ -143,3 +144,25 @@ def set_metadata_field(
 
     # No usable front matter — prepend a fresh block.
     return f"---\n{line}\n---\n\n{text}"
+
+
+_TRUTHY_VALUES = {"true", "yes", "1", "on"}
+"""Scalars a document's front matter may use to mean yes."""
+
+
+def is_truthy(value: str | None) -> bool:
+    """Interpret a YAML-ish scalar string as a boolean.
+
+    Treats ``"true"``, ``"yes"``, ``"1"`` and ``"on"`` (case-insensitive,
+    surrounding whitespace ignored) as ``True``; everything else,
+    including ``None`` and the empty string, is ``False``.
+
+    Args:
+        value: Raw metadata string, or ``None`` when the key is absent.
+
+    Returns:
+        ``True`` when the value reads as an affirmative boolean.
+    """
+    if value is None:
+        return False
+    return value.strip().lower() in _TRUTHY_VALUES

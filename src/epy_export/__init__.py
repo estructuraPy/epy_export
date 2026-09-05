@@ -38,6 +38,7 @@ from ._core._backends import (
 )
 from ._core._files import write_text_atomic
 from ._core._frontmatter import (
+    is_truthy,
     parse_front_matter,
     parse_header_cells,
     set_metadata_field,
@@ -100,6 +101,7 @@ __all__ = [
     "eval_js",
     "extract_anchor_pages",
     "installed",
+    "is_truthy",
     "load_backend",
     "parse_front_matter",
     "parse_header_cells",
