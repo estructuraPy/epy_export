@@ -42,6 +42,7 @@ _UNDERSTOOD = (
     "language",
     "project_type",
     "source_kind",
+    "document_type",
 )
 """Everything but the journal profile. This is the only engine whose
 entry point takes cover metadata, which is why three prose documents

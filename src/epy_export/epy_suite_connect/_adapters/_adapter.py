@@ -22,6 +22,7 @@ from pathlib import Path
 from ..._core._backends import backend_route
 from .._contract._engine import (
     APPEARANCES,
+    DOCUMENT_TYPES,
     Engine,
     EngineUnavailableError,
     RenderOptions,
@@ -149,6 +150,8 @@ def render(
         )
     if opts.appearance and spec.themed:
         _refuse_unknown_appearance(spec, opts.appearance)
+    if opts.document_type and adapter_reads_document_type(spec):
+        _refuse_unknown_document_type(opts.document_type)
     _refuse_foreign_options(spec, opts)
     if not available(engine_id):
         raise EngineUnavailableError(
@@ -160,7 +163,10 @@ def render(
 
     adapter = _ADAPTERS[spec.engine_id]
     if adapter is _docs:
-        return _docs.emit_all(spec, source, output_dir, formats, opts)
+        return _docs.emit_all(
+            spec, source, output_dir, formats, opts,
+            document_type=opts.document_type,
+        )
     produced: list[Path] = []
     for fmt in formats:
         target = output_dir / f"{source.stem}.{fmt}"
@@ -175,6 +181,31 @@ def render(
             )
         produced.append(target)
     return produced
+
+
+def adapter_reads_document_type(spec: Engine) -> bool:
+    """Whether this engine reads a document kind at all."""
+    return "document_type" in understood_by(spec.engine_id)
+
+
+def _refuse_unknown_document_type(document_type: str) -> None:
+    """Raise when the document kind is not one the writer publishes.
+
+    Args:
+        document_type: The kind asked for.
+
+    Raises:
+        ValueError: Naming what is offered. Symmetric with the
+            appearance check: a typo reaching the writer produces a
+            document of the DEFAULT kind, which looks like a correct
+            render of the wrong thing.
+    """
+    if document_type in DOCUMENT_TYPES:
+        return
+    raise ValueError(
+        f"{document_type!r} is not a document kind this family "
+        f"publishes; it offers: {', '.join(DOCUMENT_TYPES)}."
+    )
 
 
 def _refuse_unknown_appearance(spec: Engine, appearance: str) -> None:

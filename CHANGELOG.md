@@ -48,6 +48,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compares them with the engine wherever it can be reached so the
   copy cannot drift in silence.
 
+- **`RenderOptions.document_type`, and the dispatcher forwards it.**
+  The kind is chosen in a dialog and only ePy Docs reads it, but it
+  stopped at the dispatcher, which always passed the default: a
+  reader who asked for a notebook received a report and no signal,
+  which is precisely the failure RenderOptions exists to refuse.
+  Asking another engine for a document kind is now refused by name,
+  and so is a kind nobody publishes -- symmetric with the appearance
+  check, because a typo reaching the writer produces a document of
+  the DEFAULT kind, which looks like a correct render of the wrong
+  thing.
+
 ## [0.2.0] — 2026-09-05
 
 ### Added

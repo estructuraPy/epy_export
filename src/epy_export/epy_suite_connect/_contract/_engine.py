@@ -118,6 +118,11 @@ class RenderOptions:
             author from front matter and a report takes none.
         language: Document language.
         project_type: Cover subtitle.
+        document_type: Which kind of document the generic writer
+            should build, one of :data:`DOCUMENT_TYPES`. Read by
+            ePy Docs alone: the other three engines ARE a document
+            kind, so asking one of them for another is a question
+            with no answer and is refused by name.
         source_kind: Whether the source is plain Markdown or Quarto.
             Explicit, never guessed from the suffix: epy_reports feeds
             Quarto with directives in it and epy_craft feeds plain
@@ -132,6 +137,7 @@ class RenderOptions:
     language: str = "es"
     project_type: str = ""
     source_kind: str = "markdown"
+    document_type: str = "report"
 
     def named_fields(self) -> tuple[str, ...]:
         """Return the fields carrying something other than their default.
@@ -150,6 +156,7 @@ class RenderOptions:
                 "language",
                 "project_type",
                 "source_kind",
+                "document_type",
             )
             if getattr(self, name) != getattr(empty, name)
         )

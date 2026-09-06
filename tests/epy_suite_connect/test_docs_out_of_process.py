@@ -129,6 +129,11 @@ def _in_process_calls(
 ) -> Calls:
     """Render with the engine imported here; return what it was told."""
     calls = _fake_on_path(tmp_path, monkeypatch)
+    # The REAL library may already be in sys.modules -- another test in
+    # this suite imports it to check the vocabulary has not drifted --
+    # and an import would then hand back that one and render for real.
+    # Measured: this test passed alone and failed in company.
+    saved = sys.modules.pop("epy_docs", None)
     sys.path.insert(0, str(tmp_path / "fakelib"))
     try:
         import epy_docs  # noqa: PLC0415 - the stand-in written above
@@ -145,6 +150,8 @@ def _in_process_calls(
     finally:
         sys.path.remove(str(tmp_path / "fakelib"))
         sys.modules.pop("epy_docs", None)
+        if saved is not None:
+            sys.modules["epy_docs"] = saved
     return _read(calls)
 
 
@@ -276,3 +283,60 @@ def test_the_job_is_json_serialisable(tmp_path: Path, source: Path) -> None:
         footer="f", bibliography=None, csl=None,
     )
     assert json.loads(json.dumps(job)) == job
+
+
+def test_the_chosen_document_kind_reaches_the_writer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source: Path
+) -> None:
+    # The kind is chosen in a dialog and it is ePy Docs that reads it.
+    # Before this it stopped at the dispatcher, which always passed the
+    # default -- so a reader who asked for a notebook got a report and
+    # no signal, which is the failure RenderOptions exists to refuse.
+    from epy_export.epy_suite_connect._adapters import _adapter
+
+    calls = _fake_on_path(tmp_path, monkeypatch)
+    monkeypatch.setattr(_backends, "backend_present", lambda module: False)
+    monkeypatch.setattr(_docs, "backend_route", _backends.backend_route)
+    monkeypatch.setenv(_backends.ENV_DOCS_PYTHON, sys.executable)
+    _adapter.render(
+        source, tmp_path / "out",
+        engine_id="docs",
+        formats=["html"],
+        options=RenderOptions(document_type="notebook"),
+    )
+    constructor = dict(_read(calls))["__init__"]
+    assert constructor["document_type"] == "notebook"
+
+
+def test_asking_another_engine_for_a_document_kind_is_refused(
+    tmp_path: Path, source: Path
+) -> None:
+    # ePy Reports IS a document kind. Asking it for a notebook has no
+    # answer, and dropping the field in silence is how a caller comes to
+    # believe they asked for something they never got.
+    from epy_export.epy_suite_connect._adapters import _adapter
+
+    with pytest.raises(ValueError, match="document_type"):
+        _adapter.render(
+            source, tmp_path / "out",
+            engine_id="reports",
+            formats=["html"],
+            options=RenderOptions(document_type="notebook"),
+        )
+
+
+def test_a_document_kind_nobody_publishes_is_refused(
+    tmp_path: Path, source: Path
+) -> None:
+    # Symmetric with the appearance check. A typo reaching the writer
+    # produces a document of the DEFAULT kind, which looks like a
+    # correct render of the wrong thing.
+    from epy_export.epy_suite_connect._adapters import _adapter
+
+    with pytest.raises(ValueError, match="not a document kind"):
+        _adapter.render(
+            source, tmp_path / "out",
+            engine_id="docs",
+            formats=["html"],
+            options=RenderOptions(document_type="memorandum"),
+        )
