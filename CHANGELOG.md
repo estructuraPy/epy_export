@@ -40,6 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   child that hangs is given up on, because a wrong interpreter must not
   hang the application for ever.
 
+- **`DOCUMENT_TYPES`, beside `APPEARANCES`.** A dialog that asked the
+  engine for its layouts and document types could not be BUILT inside
+  a frozen bundle, where the engine cannot be imported, so the export
+  entry stayed unreachable for a second reason. Both vocabularies now
+  live here, which every application already carries, and a test
+  compares them with the engine wherever it can be reached so the
+  copy cannot drift in silence.
+
 ## [0.2.0] — 2026-09-05
 
 ### Added

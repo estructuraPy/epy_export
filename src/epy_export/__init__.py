@@ -73,6 +73,7 @@ from .epy_suite_connect._adapters._adapter import (
 )
 from .epy_suite_connect._contract._engine import (
     APPEARANCES,
+    DOCUMENT_TYPES,
     Engine,
     EngineUnavailableError,
     RenderOptions,
@@ -84,6 +85,7 @@ __author__ = "Ing. Angel Navarro-Mora M.Sc."
 
 __all__ = [
     "APPEARANCES",
+    "DOCUMENT_TYPES",
     "ENV_DOCS_PYTHON",
     "BackendUnavailableError",
     "ENGINES",

@@ -15,6 +15,7 @@ from ..._core._backends import BackendUnavailableError
 
 __all__ = [
     "APPEARANCES",
+    "DOCUMENT_TYPES",
     "Engine",
     "EngineUnavailableError",
     "RenderOptions",
@@ -37,6 +38,22 @@ Nine names a user learns once and knows everywhere. This tuple is the
 answer for a machine with no engine installed to publish its own; where
 an engine does publish one, the adapter asks it rather than trusting
 this copy.
+"""
+
+DOCUMENT_TYPES: tuple[str, ...] = (
+    "report",
+    "paper",
+    "book",
+    "notebook",
+)
+"""The kinds of document the generic writer can build.
+
+Kept here, beside the layouts, for one reason: inside a frozen bundle
+the engine that publishes them cannot be imported at all, so a dialog
+that asked IT could not be built and the whole export entry stayed
+unreachable. This tuple is what a window is drawn from; a test compares
+it against the engine wherever the engine can be reached, so the two
+cannot drift in silence.
 """
 
 
