@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
-from ..._core._backends import backend_present
+from ..._core._backends import backend_route
 from .._contract._engine import (
     APPEARANCES,
     Engine,
@@ -54,8 +54,12 @@ def available(engine_id: str) -> bool:
     Cheap on purpose: it answers "should I offer this?" while a menu is
     being built, and importing an engine to find out whether it exists
     pulls its whole stack in to draw a menu item.
+
+    Asks the ROUTE rather than the import, because inside a frozen
+    bundle the import has a permanently wrong answer and the menu entry
+    is greyed for everyone.
     """
-    return backend_present(engine(engine_id).module)
+    return backend_route(engine(engine_id).module).reachable
 
 
 def installed() -> tuple[str, ...]:

@@ -4,6 +4,42 @@ All notable changes to epy_export are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`backend_route`: one answer to "can this process reach the engine",
+  and one that is right inside a frozen bundle.** Every application
+  asked whether ePy Docs imports HERE, and PyInstaller closes
+  `sys.path` to the bundle, so that question has a permanently wrong
+  answer in every shipped executable: "export through ePy Docs" has
+  been greyed out for every user since the first release, ePy Draft's
+  DEFAULT engine included. The route answers `in_process` when the
+  import works, `subprocess` when ePy Studio has named an interpreter
+  that carries it, and `none` otherwise. `available()` and therefore
+  `installed()` now ask the route rather than the import.
+
+- **`ENV_DOCS_PYTHON`, with one home.** ePy Studio publishes the
+  variable and the applications read it, and neither package depends on
+  the other. Named here, where both already depend, a rename cannot
+  leave one side listening for a variable the other stopped setting.
+
+- **The ePy Docs render runs out of process when it has to.** The call
+  sequence is built once as DATA and applied twice: to a writer imported
+  here, or to one in the interpreter Studio found, reached with `-c` and
+  handed the job on stdin. One definition, two executions, so a document
+  cannot change because the renderer moved to another process — there is
+  a corpus rendered the old way, and a test compares the two sequences
+  against a real child interpreter.
+
+  Three things the wrapper respects, all measured: the child's exit code
+  is NOT the signal, because without Quarto the library swallows the
+  failure, logs it at INFO and exits zero, so the produced files on disk
+  are what is checked; the child's stderr travels back, because the
+  library's own diagnosis is the message a reader can act on; and a
+  child that hangs is given up on, because a wrong interpreter must not
+  hang the application for ever.
+
 ## [0.2.0] — 2026-09-05
 
 ### Added

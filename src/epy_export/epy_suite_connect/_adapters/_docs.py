@@ -20,11 +20,18 @@ catalog happily returned.
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
 from collections.abc import Collection
 from pathlib import Path
 from typing import Any
 
-from ..._core._backends import RenderFailedError, load_backend
+from ..._core._backends import (
+    RenderFailedError,
+    backend_route,
+    load_backend,
+)
 from .._contract._engine import Engine, RenderOptions
 
 __all__ = ["emit_all", "refuse_latex_errors", "understands"]
@@ -122,6 +129,196 @@ def staged_for_latex(source: Path, output_dir: Path) -> tuple[Path, int]:
     return staged, repair.math_delimiters
 
 
+# The call sequence, as DATA. Both executions read this and neither
+# owns it, so the document cannot change because the renderer moved to
+# another process. The applier below is six lines precisely so that the
+# copy of it inside the child script is small enough to be obviously the
+# same thing.
+Step = tuple[str, dict[str, Any]]
+
+_CHILD = """
+import json, logging, sys
+logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+job = json.loads(sys.stdin.read())
+import epy_docs
+writer = epy_docs.DocumentWriter(**job["constructor"])
+for name, kwargs in job["steps"]:
+    getattr(writer, name)(**kwargs)
+writer.generate(**job["generate"])
+"""
+"""What runs in the interpreter that has ePy Docs.
+
+Sent with ``-c`` and handed the job on STDIN, never on the command line:
+a job carries absolute paths, author names and a footer, and a command
+line is length-limited, quoted by the shell and visible in the process
+list.
+
+It configures logging to stderr because the library reports a failed
+render at INFO level and returns normally. It prints NOTHING on success:
+what the library returns is not evidence -- without Quarto it returns a
+mapping of ``None`` and exits zero -- so the parent looks at the files
+on disk instead.
+"""
+
+_CHILD_TIMEOUT = 900.0
+"""Seconds. A PDF through Quarto and LaTeX is minutes, not seconds, and
+a wrong interpreter that hangs must not hang the application for ever.
+"""
+
+
+def _job(
+    source: Path,
+    output_dir: Path,
+    formats: Collection[str],
+    opts: RenderOptions,
+    *,
+    document_type: str,
+    title: str | None,
+    client: dict[str, str] | None,
+    footer: str,
+    bibliography: Path | None,
+    csl: Path | None,
+) -> dict[str, Any]:
+    """Return the whole render as data, ready for either execution.
+
+    Args:
+        source: The document to render.
+        output_dir: Where the results go.
+        formats: Which to produce.
+        opts: Appearance, author, language, project type and source kind.
+        document_type: Which of the writer's document types to build.
+        title: Project name for the cover; the file stem when absent.
+        client: Client cover block.
+        footer: Page footer text.
+        bibliography: A ``.bib`` to cite from.
+        csl: A citation style to render it with.
+
+    Returns:
+        ``{"constructor": {...}, "steps": [[name, kwargs], ...],
+        "generate": {...}}``, all values JSON-serialisable.
+
+    Raises:
+        ValueError: When a named bibliography or CSL file is absent.
+    """
+    steps: list[Step] = []
+    if opts.author:
+        steps.append(("set_author", dict(opts.author)))
+    project: dict[str, Any] = {"name": title or source.stem}
+    if opts.project_type:
+        project["project_type"] = opts.project_type
+    steps.append(("set_project_info", project))
+    if client:
+        steps.append((
+            "set_client_info",
+            {"name": client.get("name", ""),
+             "company": client.get("company", "")},
+        ))
+    if footer:
+        steps.append(("add_page_footer", {"content": footer}))
+
+    # Explicit, never guessed from the suffix: a Quarto source fed to the
+    # Markdown reader leaks its directives into the body as literal text.
+    if opts.source_kind == "quarto":
+        steps.append((
+            "add_quarto_file",
+            {"file_path": str(source), "convert_tables": False,
+             "execute_code_blocks": False},
+        ))
+    else:
+        steps.append((
+            "add_markdown_file",
+            {"file_path": str(source), "convert_tables": False},
+        ))
+
+    generate: dict[str, Any] = {
+        "pdf": "pdf" in formats,
+        "docx": "docx" in formats,
+        "html": "html" in formats,
+        "qmd": False,
+        "output_filename": source.stem,
+    }
+    if bibliography is not None:
+        if not bibliography.is_file():
+            raise ValueError(f"Bibliography not found: {bibliography}")
+        generate["bibliography_path"] = str(bibliography)
+    if csl is not None:
+        if not csl.is_file():
+            raise ValueError(f"CSL file not found: {csl}")
+        generate["csl_path"] = str(csl)
+
+    return {
+        "constructor": {
+            "document_type": document_type,
+            "layout_style": opts.appearance,
+            "language": opts.language,
+            "output_dir": str(output_dir),
+        },
+        "steps": [list(step) for step in steps],
+        "generate": generate,
+    }
+
+
+def _in_process(spec: Engine, job: dict[str, Any]) -> None:
+    """Apply the job to a writer imported here."""
+    docs = load_backend(spec.module, why=f"rendering through {spec.label}")
+    writer_factory: Any = docs.DocumentWriter
+    writer: Any = writer_factory(**job["constructor"])
+    for name, kwargs in job["steps"]:
+        getattr(writer, name)(**kwargs)
+    writer.generate(**job["generate"])
+
+
+def _out_of_process(spec: Engine, job: dict[str, Any], python: str) -> None:
+    """Apply the job in the interpreter that carries the engine.
+
+    Inside a frozen bundle this is the ONLY way the engine can be
+    reached: PyInstaller closes ``sys.path`` to the bundle, so importing
+    it here can never work however the spec is written.
+
+    Args:
+        spec: The engine row, for the message.
+        job: What :func:`_job` built.
+        python: The interpreter to run it in.
+
+    Raises:
+        RenderFailedError: When the child could not be started, timed
+            out, or exited non-zero -- carrying its stderr, which is
+            where the library's own diagnosis goes.
+
+    Note:
+        A child that exits ZERO has still proven nothing. Without Quarto
+        the library swallows the failure, logs it at INFO and returns a
+        mapping whose values are ``None``; the caller checks the files on
+        disk afterwards, which is the only honest signal.
+    """
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    try:
+        finished = subprocess.run(
+            [python, "-c", _CHILD],
+            input=json.dumps(job),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=_CHILD_TIMEOUT,
+            env=env,
+            check=False,
+        )
+    except OSError as exc:
+        raise RenderFailedError(
+            f"{spec.label} could not be started in {python}: {exc}"
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise RenderFailedError(
+            f"{spec.label} did not finish within {_CHILD_TIMEOUT:.0f}s "
+            f"in {python}."
+        ) from exc
+    if finished.returncode != 0:
+        tail = (finished.stderr or "").strip().splitlines()[-12:]
+        raise RenderFailedError(
+            f"{spec.label} failed in {python}:\n" + "\n".join(tail)
+        )
+
+
 def emit_all(
     spec: Engine,
     source: Path,
@@ -164,58 +361,22 @@ def emit_all(
             not on disk afterwards.
     """
     source, _repaired = staged_for_latex(source, output_dir)
-    docs = load_backend(spec.module, why=f"rendering through {spec.label}")
-    writer_factory: Any = docs.DocumentWriter
-    writer: Any = writer_factory(
+    job = _job(
+        source, output_dir, formats, opts,
         document_type=document_type,
-        layout_style=opts.appearance,
-        language=opts.language,
-        output_dir=str(output_dir),
+        title=title,
+        client=client,
+        footer=footer,
+        bibliography=bibliography,
+        csl=csl,
     )
-    if opts.author:
-        writer.set_author(**dict(opts.author))
-    writer.set_project_info(
-        name=title or source.stem,
-        **({"project_type": opts.project_type} if opts.project_type else {}),
-    )
-    if client:
-        writer.set_client_info(
-            name=client.get("name", ""), company=client.get("company", "")
-        )
-    if footer:
-        writer.add_page_footer(footer)
-
-    # Explicit, never guessed from the suffix: a Quarto source fed to the
-    # Markdown reader leaks its directives into the body as literal text.
-    if opts.source_kind == "quarto":
-        writer.add_quarto_file(
-            str(source), convert_tables=False, execute_code_blocks=False
-        )
+    route = backend_route(spec.module)
+    if route.mode == "subprocess":
+        _out_of_process(spec, job, route.python)
     else:
-        writer.add_markdown_file(str(source), convert_tables=False)
-
-    # Named apart from the project-info block above, which used to bind
-    # a local called `extras` too. It worked only because the first was
-    # consumed before the second was bound, which is how the next edit
-    # inserted between them silently drops a cover field.
-    citation_args: dict[str, Any] = {}
-    if bibliography is not None:
-        if not bibliography.is_file():
-            raise ValueError(f"Bibliography not found: {bibliography}")
-        citation_args["bibliography_path"] = str(bibliography)
-    if csl is not None:
-        if not csl.is_file():
-            raise ValueError(f"CSL file not found: {csl}")
-        citation_args["csl_path"] = str(csl)
-
-    writer.generate(
-        pdf="pdf" in formats,
-        docx="docx" in formats,
-        html="html" in formats,
-        qmd=False,
-        output_filename=source.stem,
-        **citation_args,
-    )
+        # load_backend raises BackendUnavailableError, by name, when the
+        # route said none: that message is the one a reader can act on.
+        _in_process(spec, job)
 
     refuse_latex_errors(output_dir / f"{source.stem}.log")
     produced = [

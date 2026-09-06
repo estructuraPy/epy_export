@@ -31,9 +31,12 @@ wants to read a document's front matter pays nothing for the rest.
 from __future__ import annotations
 
 from ._core._backends import (
+    ENV_DOCS_PYTHON,
     BackendUnavailableError,
     RenderFailedError,
+    Route,
     backend_present,
+    backend_route,
     load_backend,
 )
 from ._core._files import write_text_atomic
@@ -81,6 +84,7 @@ __author__ = "Ing. Angel Navarro-Mora M.Sc."
 
 __all__ = [
     "APPEARANCES",
+    "ENV_DOCS_PYTHON",
     "BackendUnavailableError",
     "ENGINES",
     "Engine",
@@ -89,6 +93,7 @@ __all__ = [
     "ORGANIZATION",
     "RenderFailedError",
     "RenderOptions",
+    "Route",
     "add_footer",
     "add_header",
     "add_metadata",
@@ -96,6 +101,7 @@ __all__ = [
     "add_watermark",
     "available",
     "backend_present",
+    "backend_route",
     "engine",
     "engine_ids",
     "eval_js",

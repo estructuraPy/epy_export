@@ -29,14 +29,86 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import os
+from dataclasses import dataclass
+from pathlib import Path
 from types import ModuleType
 
 __all__ = [
+    "ENV_DOCS_PYTHON",
     "BackendUnavailableError",
     "RenderFailedError",
+    "Route",
     "backend_present",
+    "backend_route",
     "load_backend",
 ]
+
+ENV_DOCS_PYTHON = "EPY_DOCS_PYTHON"
+"""Where an interpreter carrying ePy Docs was found, for a child process.
+
+Published by ePy Studio when it launches an application, read here. The
+name lives in this package because both ends depend on it and neither
+depends on the other: Studio imports it, the applications import it, and
+a rename therefore cannot leave one side listening for a variable the
+other stopped setting.
+"""
+
+_HINTED = {"epy_docs": ENV_DOCS_PYTHON}
+"""Engines that can be reached in another interpreter, and the variable
+naming it. Only ePy Docs: the other three engines are the applications
+this bundle already carries.
+"""
+
+
+@dataclass(frozen=True)
+class Route:
+    """How this process can reach an engine, if at all.
+
+    Attributes:
+        mode: ``"in_process"``, ``"subprocess"`` or ``"none"``.
+        python: The interpreter to run it in, for ``"subprocess"``.
+    """
+
+    mode: str
+    python: str = ""
+
+    @property
+    def reachable(self) -> bool:
+        """Whether the engine can be reached at all."""
+        return self.mode != "none"
+
+
+def backend_route(module: str) -> Route:
+    """Return how this process can reach ``module``.
+
+    Asking only whether the module imports HERE is the question that has
+    a permanently wrong answer inside a frozen bundle: PyInstaller closes
+    ``sys.path`` to the bundle, so a package installed in the user's own
+    Python is invisible no matter what the spec says. Every application
+    asked it that way, so every "export through ePy Docs" entry has been
+    greyed out in every shipped executable since the first release --
+    including ePy Draft's DEFAULT engine.
+
+    So the question is about the MACHINE. Import here when we can, and
+    otherwise use the interpreter ePy Studio found and named in the
+    environment.
+
+    Args:
+        module: Importable package name, e.g. ``"epy_docs"``.
+
+    Returns:
+        The route. ``"none"`` is a normal answer, not an error: the
+        applications work without the optional engine.
+    """
+    if backend_present(module):
+        return Route("in_process")
+    variable = _HINTED.get(module)
+    if variable:
+        named = os.environ.get(variable, "")
+        if named and Path(named).is_file():
+            return Route("subprocess", named)
+    return Route("none")
 
 
 class BackendUnavailableError(RuntimeError):
