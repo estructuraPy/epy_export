@@ -9,13 +9,17 @@ copy is only safe while something compares it with the original.
 
 from __future__ import annotations
 
-import importlib.util
-
 import pytest
 
-from epy_export import APPEARANCES, DOCUMENT_TYPES
+from epy_export import APPEARANCES, DOCUMENT_TYPES, backend_present
 
-_HAS_DOCS = importlib.util.find_spec("epy_docs") is not None
+# This package's own helper, not a naked find_spec. find_spec RAISES on
+# an import hook that refuses the name -- which is how a machine without
+# the private engine is simulated, and how some environments answer --
+# and backend_present is the function that already catches it. A bare
+# call here turned "the engine is absent" into a collection error, so
+# the whole module failed instead of skipping.
+_HAS_DOCS = backend_present("epy_docs")
 
 
 def test_the_vocabularies_are_pinned() -> None:
