@@ -144,11 +144,14 @@ def test_a_page_already_the_right_size_is_left_untouched(
     # pass with the guard deleted. Measured on a drawn page: 83 bytes
     # before, 107 after, because the page is wrapped in a matrix.
     cover = _drawn(tmp_path / "cover.pdf", LETTER)
-    before = PdfReader(str(cover)).pages[0].get_contents().get_data()
+    drawn = PdfReader(str(cover)).pages[0].get_contents()
+    assert drawn is not None, "the fixture page has nothing on it"
+    before = drawn.get_data()
     prepend_pdf(document, cover)
-    joined = PdfReader(str(document)).pages[0]
+    joined = PdfReader(str(document)).pages[0].get_contents()
     assert _sizes(document)[0] == (round(LETTER[0]), round(LETTER[1]))
-    assert joined.get_contents().get_data() == before
+    assert joined is not None
+    assert joined.get_data() == before
 
 
 def test_every_file_that_is_not_there_is_named_at_once(
