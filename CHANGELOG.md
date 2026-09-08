@@ -4,6 +4,31 @@ All notable changes to epy_export are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`prepend_pdf` and `append_pdf`: joining a reader's own PDF pages to
+  a rendered document.** WHERE a page is joined is the whole design.
+  Pages joined BEFORE the stamping are numbered with the document;
+  pages joined AFTER it are not. That is how a cover template supplied
+  by the reader stays unnumbered front matter while annexes continue
+  the body's numbering, without one change to how numbering works.
+
+  A page of another size is FITTED to the document's sheet rather than
+  left at its own: a cover drawn on A4 dropped into a Letter report is
+  visibly the wrong size, and nobody who supplied a template asked for
+  one page of their report to be a different shape. It is fitted, not
+  stretched, and a page already the right size is left untouched --
+  scaling by exactly one still rewrites the content stream.
+
+  A file that is not there is named, and ALL of them are named at once:
+  the library raises on the first it cannot open, so a reader who
+  mistyped two paths would fix one, run again, and be told about the
+  other. And the merge clones rather than building a fresh writer,
+  because a fresh one drops the document catalogue and with it the
+  named destinations the index links to.
+
 ## [0.3.0] — 2026-09-08
 
 ### Added

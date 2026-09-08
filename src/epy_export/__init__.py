@@ -54,7 +54,9 @@ from ._core._pdf_stamp import (
     add_metadata,
     add_page_background,
     add_watermark,
+    append_pdf,
     extract_anchor_pages,
+    prepend_pdf,
     scale_pages_to_width,
 )
 from ._core._qt_print import (
@@ -101,6 +103,7 @@ __all__ = [
     "add_metadata",
     "add_page_background",
     "add_watermark",
+    "append_pdf",
     "available",
     "backend_present",
     "backend_route",
@@ -114,6 +117,7 @@ __all__ = [
     "parse_front_matter",
     "parse_header_cells",
     "pin_system_icu",
+    "prepend_pdf",
     "print_to_pdf",
     "pump",
     "remove_temp",

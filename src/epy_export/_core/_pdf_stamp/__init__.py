@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+from collections.abc import Sequence
 from pathlib import Path
 
 # Footer geometry / styling.
@@ -597,3 +598,117 @@ def scale_pages_to_width(
             page.scale_by(target_pt / width_pt)
     with pdf_path.open("wb") as handle:
         writer.write(handle)
+
+
+def _fit_to(pages: list[object], width_pt: float, height_pt: float) -> None:
+    """Scale pages that do not match the document's sheet.
+
+    A cover drawn on A4 dropped into a Letter document is visibly the
+    wrong size, and a reader who supplied a template did not ask for
+    one page of their report to be a different shape from the rest.
+    The scale is uniform, so nothing is stretched; a page already the
+    right size is left untouched rather than resampled.
+
+    Args:
+        pages: The pages to fit, modified in place.
+        width_pt: The document's page width, in points.
+        height_pt: The document's page height, in points.
+    """
+    for page in pages:
+        own_width = float(page.mediabox.width)  # type: ignore[attr-defined]
+        own_height = float(page.mediabox.height)  # type: ignore[attr-defined]
+        if own_width <= 0 or own_height <= 0:
+            continue
+        if (
+            abs(own_width - width_pt) < 1.0
+            and abs(own_height - height_pt) < 1.0
+        ):
+            continue
+        # The smaller of the two ratios: the page must FIT the sheet,
+        # and scaling to the wider one would crop the other edge.
+        page.scale_by(  # type: ignore[attr-defined]
+            min(width_pt / own_width, height_pt / own_height)
+        )
+
+
+def _sheet(pdf_path: Path) -> tuple[float, float]:
+    """Return the first page's size in points, as (width, height)."""
+    from pypdf import PdfReader  # noqa: PLC0415
+
+    first = PdfReader(str(pdf_path)).pages[0]
+    return float(first.mediabox.width), float(first.mediabox.height)
+
+
+def _joined(pdf_path: Path, others: Sequence[Path], *, before: bool) -> None:
+    """Merge ``others`` into ``pdf_path``, fitted to its sheet.
+
+    Args:
+        pdf_path: The document, rewritten in place.
+        others: The PDFs to join, in the order given.
+        before: Whether they go in front of the document.
+
+    Raises:
+        FileNotFoundError: Naming the first file that is not there. A
+            page a reader asked for and did not get is worse than an
+            export that refuses: the refusal is read, the absence is
+            discovered later by whoever received the document.
+    """
+    from pypdf import PdfWriter  # noqa: PLC0415
+
+    missing = [str(item) for item in others if not Path(item).is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "PDF pages to join were not found: " + ", ".join(missing)
+        )
+    width_pt, height_pt = _sheet(pdf_path)
+    # Clone rather than a fresh writer: a fresh one drops the document
+    # catalog, and with it the named destinations the index links to.
+    writer = PdfWriter(clone_from=str(pdf_path))
+    at = 0
+    for item in others:
+        joined = PdfWriter(clone_from=str(item))
+        _fit_to(list(joined.pages), width_pt, height_pt)
+        for page in joined.pages:
+            if before:
+                writer.insert_page(page, at)
+                at += 1
+            else:
+                writer.add_page(page)
+    with pdf_path.open("wb") as handle:
+        writer.write(handle)
+
+
+def prepend_pdf(pdf_path: Path, cover: Path | Sequence[Path]) -> None:
+    """Put a reader's own pages in front of the document.
+
+    Called AFTER the stamping, which is what keeps these pages out of
+    the numbering: a cover template is front matter, and the body has
+    already been renumbered from 1, so nothing the index says moves.
+
+    Args:
+        pdf_path: The finished document, rewritten in place.
+        cover: The PDF, or PDFs, to put in front.
+
+    Raises:
+        FileNotFoundError: Naming what is not there.
+    """
+    items = [cover] if isinstance(cover, (str, Path)) else list(cover)
+    _joined(pdf_path, [Path(item) for item in items], before=True)
+
+
+def append_pdf(pdf_path: Path, annexes: Path | Sequence[Path]) -> None:
+    """Put a reader's own pages after the document.
+
+    Called BEFORE the stamping, which is what puts these pages INTO the
+    numbering: they are part of the document, not front matter, and the
+    footer that follows counts them with everything else.
+
+    Args:
+        pdf_path: The document so far, rewritten in place.
+        annexes: The PDF, or PDFs, to append, in the order given.
+
+    Raises:
+        FileNotFoundError: Naming what is not there.
+    """
+    items = [annexes] if isinstance(annexes, (str, Path)) else list(annexes)
+    _joined(pdf_path, [Path(item) for item in items], before=False)
