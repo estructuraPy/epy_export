@@ -59,6 +59,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the DEFAULT kind, which looks like a correct render of the wrong
   thing.
 
+- **One export dialog for the three editors**, in `_ui`. It is the
+  same two combos, the same directory picker, the same format
+  checkboxes and the same three remembered keys in each of them;
+  only the registry scope and the two translators differ, so those
+  are passed in. Three copies of one window is the shape this suite
+  has been paying for elsewhere. The subpackage is never imported by
+  the facade, so a caller who only wants to read front matter still
+  pays nothing for Qt.
+
 ## [0.2.0] — 2026-09-05
 
 ### Added
