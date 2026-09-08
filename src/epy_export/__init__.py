@@ -57,6 +57,7 @@ from ._core._pdf_stamp import (
     append_pdf,
     extract_anchor_pages,
     prepend_pdf,
+    require_pdfs,
     scale_pages_to_width,
 )
 from ._core._qt_print import (
@@ -82,7 +83,7 @@ from .epy_suite_connect._contract._engine import (
 )
 from .epy_suite_connect._data._catalog import ENGINES, engine, engine_ids
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __author__ = "Ing. Angel Navarro-Mora M.Sc."
 
 __all__ = [
@@ -122,6 +123,7 @@ __all__ = [
     "pump",
     "remove_temp",
     "render",
+    "require_pdfs",
     "scale_pages_to_width",
     "set_metadata_field",
     "strip_front_matter",

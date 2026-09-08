@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from epy_export import append_pdf, prepend_pdf
+from epy_export import add_footer, append_pdf, prepend_pdf, require_pdfs
 
 LETTER = (612.0, 792.0)
 A4 = (595.0, 842.0)
@@ -211,6 +211,50 @@ def test_the_document_keeps_its_named_destinations(tmp_path: Path) -> None:
 
     prepend_pdf(source, _pdf(tmp_path / "cover.pdf", 1))
     assert PdfReader(str(source)).named_destinations
+
+
+def test_where_a_page_is_joined_decides_whether_it_is_numbered(
+    tmp_path: Path,
+) -> None:
+    """The claim this module is built on, read off the pages.
+
+    Everything above measures WHERE a page lands. This measures what
+    landing there does to it, which is the reason the two functions are
+    called at different points: the annex joined before the stamping is
+    numbered in continuity with the body, and the cover joined after it
+    carries nothing. Neither function knows anything about numbering.
+    """
+    from pypdf import PdfReader
+
+    document = _pdf(tmp_path / "doc.pdf", 2)
+    append_pdf(document, _pdf(tmp_path / "annex.pdf", 1))
+    add_footer(document, "", page_numbers=True)
+    prepend_pdf(document, _pdf(tmp_path / "cover.pdf", 1))
+
+    stamped = [
+        (page.extract_text() or "").strip()
+        for page in PdfReader(str(document)).pages
+    ]
+    assert stamped[0] == "", f"the cover was numbered: {stamped}"
+    # Continuity, not a restart: the annex is the document's page 3, and
+    # the total counts it.
+    assert stamped[1:] == ["Page 1 of 3", "Page 2 of 3", "Page 3 of 3"]
+
+
+def test_the_same_refusal_is_available_before_rendering(
+    tmp_path: Path,
+) -> None:
+    """The check with no document to join into.
+
+    A caller that renders for a minute and only then discovers a
+    mistyped path has spent the minute for nothing, so the check has to
+    be callable up front. Same message, same one-shot naming.
+    """
+    require_pdfs([_pdf(tmp_path / "here.pdf", 1)])
+    with pytest.raises(FileNotFoundError) as raised:
+        require_pdfs([tmp_path / "primero.pdf", tmp_path / "segundo.pdf"])
+    assert "primero.pdf" in str(raised.value)
+    assert "segundo.pdf" in str(raised.value)
 
 
 def test_one_path_and_a_list_mean_the_same(tmp_path: Path) -> None:

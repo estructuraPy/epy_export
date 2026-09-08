@@ -639,6 +639,32 @@ def _sheet(pdf_path: Path) -> tuple[float, float]:
     return float(first.mediabox.width), float(first.mediabox.height)
 
 
+def require_pdfs(items: Sequence[Path]) -> None:
+    """Refuse unless every declared PDF is on disk, naming those that are not.
+
+    A page a reader asked for and did not get is worse than an export
+    that refuses: the refusal is read, the absence is discovered later
+    by whoever received the document. The library raises on the FIRST
+    file it cannot open, so a reader who mistyped two paths would fix
+    one, run again and be told about the other -- which is why every
+    missing name goes into one message.
+
+    Callers that render before joining should call this up front, so a
+    mistyped path costs a message instead of a full export.
+
+    Args:
+        items: The declared PDF paths, in the order given.
+
+    Raises:
+        FileNotFoundError: Naming every path that is not a file.
+    """
+    missing = [str(item) for item in items if not Path(item).is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "PDF pages to join were not found: " + ", ".join(missing)
+        )
+
+
 def _joined(pdf_path: Path, others: Sequence[Path], *, before: bool) -> None:
     """Merge ``others`` into ``pdf_path``, fitted to its sheet.
 
@@ -648,18 +674,11 @@ def _joined(pdf_path: Path, others: Sequence[Path], *, before: bool) -> None:
         before: Whether they go in front of the document.
 
     Raises:
-        FileNotFoundError: Naming the first file that is not there. A
-            page a reader asked for and did not get is worse than an
-            export that refuses: the refusal is read, the absence is
-            discovered later by whoever received the document.
+        FileNotFoundError: Naming every file that is not there.
     """
     from pypdf import PdfWriter  # noqa: PLC0415
 
-    missing = [str(item) for item in others if not Path(item).is_file()]
-    if missing:
-        raise FileNotFoundError(
-            "PDF pages to join were not found: " + ", ".join(missing)
-        )
+    require_pdfs(others)
     width_pt, height_pt = _sheet(pdf_path)
     # Clone rather than a fresh writer: a fresh one drops the document
     # catalog, and with it the named destinations the index links to.

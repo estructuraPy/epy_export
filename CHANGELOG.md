@@ -4,7 +4,7 @@ All notable changes to epy_export are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] — 2026-09-08
 
 ### Added
 
@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   other. And the merge clones rather than building a fresh writer,
   because a fresh one drops the document catalogue and with it the
   named destinations the index links to.
+
+- **`require_pdfs`: the same refusal, callable before rendering.** The
+  check the joining does was only reachable BY joining, so an
+  application that renders for a minute and then joins could only
+  discover a mistyped path after paying for the render — and, in a
+  window, deliver it as a bare "export failed" with no reason in it.
+  It is one implementation and one message, used by the joining and by
+  the callers that want to fail early.
 
 ## [0.3.0] — 2026-09-08
 
