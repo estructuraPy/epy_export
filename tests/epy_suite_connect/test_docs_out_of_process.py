@@ -136,7 +136,7 @@ def _in_process_calls(
     saved = sys.modules.pop("epy_docs", None)
     sys.path.insert(0, str(tmp_path / "fakelib"))
     try:
-        import epy_docs  # noqa: PLC0415 - the stand-in written above
+        import epy_docs  # pyright: ignore[reportMissingImports] - epy_docs is a private commercial package, absent from the public CI by design  # noqa: PLC0415 - the stand-in written above
 
         monkeypatch.setattr(
             _docs, "load_backend", lambda module, why: epy_docs

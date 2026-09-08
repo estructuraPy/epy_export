@@ -34,7 +34,7 @@ def test_the_vocabularies_are_pinned() -> None:
     reason="ePy Docs is a private commercial package; absent here",
 )
 def test_the_layouts_still_match_the_engine() -> None:
-    import epy_docs  # noqa: PLC0415 - optional, guarded above
+    import epy_docs  # pyright: ignore[reportMissingImports] - epy_docs is a private commercial package, absent from the public CI by design  # noqa: PLC0415 - optional, guarded above
 
     assert sorted(APPEARANCES) == sorted(epy_docs.available_layouts())
 
@@ -44,7 +44,7 @@ def test_the_layouts_still_match_the_engine() -> None:
     reason="ePy Docs is a private commercial package; absent here",
 )
 def test_the_document_types_still_match_the_engine() -> None:
-    import epy_docs  # noqa: PLC0415 - optional, guarded above
+    import epy_docs  # pyright: ignore[reportMissingImports] - epy_docs is a private commercial package, absent from the public CI by design  # noqa: PLC0415 - optional, guarded above
 
     assert sorted(DOCUMENT_TYPES) == sorted(
         epy_docs.available_document_types()
