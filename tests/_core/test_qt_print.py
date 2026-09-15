@@ -94,9 +94,40 @@ def test_each_wait_starts_its_own_clock() -> None:
     assert app.pumps > after_first
 
 
+def test_pump_spins_the_loop_for_the_given_budget() -> None:
+    app = _FakeApp()
+    _qt_print.pump(app, 60)
+    assert app.pumps > 0
+
+
 def test_javascript_answers_come_back() -> None:
     app, page = _FakeApp(), _FakePage()
     assert _qt_print.eval_js(app, page, "window.ready") is True
+
+
+def test_javascript_pumps_while_the_answer_is_pending() -> None:
+    # _FakePage above answers synchronously, so the loop in eval_js
+    # never actually spins -- this is the deferred-answer case, where
+    # the callback only fires after the loop has pumped a few times.
+    pumped = {"count": 0}
+    delivered: dict[str, object] = {}
+
+    class _DeferredPage:
+        def runJavaScript(self, _expr, callback) -> None:  # noqa: N802
+            delivered["callback"] = callback
+
+    class _SlowApp:
+        def processEvents(self, *_a, **_k) -> None:  # noqa: N802
+            pumped["count"] += 1
+            if pumped["count"] == 2:
+                delivered["callback"]("answer")
+
+    result = _qt_print.eval_js(
+        _SlowApp(), _DeferredPage(), "window.ready", timeout_ms=5000
+    )
+
+    assert result == "answer"
+    assert pumped["count"] >= 2
 
 
 def test_printing_reports_what_the_engine_reported() -> None:
@@ -112,6 +143,24 @@ def test_a_refused_print_reports_false() -> None:
     assert not _qt_print.print_to_pdf(
         app, page, Path("out.pdf"), object(), timeout_ms=500
     )
+
+
+def test_readiness_report_names_every_flag_and_the_page_count() -> None:
+    asked: list[str] = []
+
+    def _js(expr: str) -> object:
+        asked.append(expr)
+        if "pdf-page" in expr:
+            return 3
+        return False
+
+    message = _qt_print.readiness_report(_js)
+
+    assert "window._reveal_done=False" in message
+    assert "window._mathjax_done=False" in message
+    assert "window._diagrams_done=False" in message
+    assert "pdf-page count=3" in message
+    assert len(asked) == 4
 
 
 def test_a_held_temporary_file_is_retried_then_given_up_on(

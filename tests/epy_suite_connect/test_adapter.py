@@ -122,3 +122,50 @@ def test_every_engine_has_exactly_one_adapter() -> None:
     from epy_export import engine_ids
 
     assert set(_adapter._ADAPTERS) == set(engine_ids())
+
+
+class _FakeAdapter:
+    """A stand-in engine adapter whose ``emit`` is scripted per test."""
+
+    def __init__(self, write: bool) -> None:
+        self._write = write
+        self.calls: list[object] = []
+
+    def understands(self) -> tuple[str, ...]:
+        return ()
+
+    def emit(self, spec, source, target, fmt, opts) -> None:
+        self.calls.append(target)
+        if self._write:
+            target.write_text("x", encoding="utf-8")
+
+
+def test_a_successful_render_returns_every_produced_path(
+    source: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Every other test in this file exercises a refusal; epy_reports
+    # itself is not installed here, so the success path through a real
+    # adapter is exercised with a stand-in that actually writes the
+    # target -- proving render() collects and returns it.
+    monkeypatch.setattr(_adapter, "available", lambda _id: True)
+    fake = _FakeAdapter(write=True)
+    monkeypatch.setitem(_adapter._ADAPTERS, "reports", fake)
+
+    result = render(source, tmp_path, engine_id="reports", formats=("pdf",))
+
+    assert result == fake.calls
+    assert result[0].is_file()
+
+
+def test_a_reported_success_that_wrote_nothing_is_refused(
+    source: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The paired case: an engine can return normally and still have
+    # produced nothing -- the file-exists check is what catches that,
+    # not the adapter's own return value.
+    monkeypatch.setattr(_adapter, "available", lambda _id: True)
+    fake = _FakeAdapter(write=False)
+    monkeypatch.setitem(_adapter._ADAPTERS, "reports", fake)
+
+    with pytest.raises(_adapter.EngineUnavailableError, match="wrote no"):
+        render(source, tmp_path, engine_id="reports", formats=("pdf",))

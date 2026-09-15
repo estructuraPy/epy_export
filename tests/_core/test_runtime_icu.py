@@ -63,3 +63,41 @@ def test_the_warning_does_not_raise(
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         pin_system_icu()
+
+
+def test_pinning_is_a_noop_off_windows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from epy_export._core import _runtime
+
+    monkeypatch.delitem(sys.modules, "PySide6.QtCore", raising=False)
+    monkeypatch.setattr(_runtime.sys, "platform", "linux")
+    pin_system_icu()  # must not raise
+
+
+def test_pinning_is_a_noop_when_the_system_dll_is_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from epy_export._core import _runtime
+
+    monkeypatch.delitem(sys.modules, "PySide6.QtCore", raising=False)
+    monkeypatch.setattr(_runtime.sys, "platform", "win32")
+    monkeypatch.setattr(_runtime.Path, "is_file", lambda self: False)
+    pin_system_icu()  # must not raise
+
+
+def test_pinning_is_a_noop_when_the_preload_itself_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import ctypes
+
+    from epy_export._core import _runtime
+
+    def _raise(*_args: object, **_kwargs: object) -> None:
+        raise OSError("preload failed")
+
+    monkeypatch.delitem(sys.modules, "PySide6.QtCore", raising=False)
+    monkeypatch.setattr(_runtime.sys, "platform", "win32")
+    monkeypatch.setattr(_runtime.Path, "is_file", lambda self: True)
+    monkeypatch.setattr(ctypes, "WinDLL", _raise, raising=False)
+    pin_system_icu()  # must not raise

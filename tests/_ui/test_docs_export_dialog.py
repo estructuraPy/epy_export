@@ -153,6 +153,60 @@ def test_a_translator_is_optional(
     assert dialog.windowTitle() == "Export via epy_docs"
 
 
+def test_browse_outdir_updates_the_field_when_a_directory_is_chosen(
+    qt_app, scratch_settings, tmp_path: Path, monkeypatch
+) -> None:
+    # Also the only call in this file that reaches self._tr(...), which
+    # a dialog built with no translator resolves to _identity.
+    from epy_export._ui import docs_export_dialog as module
+
+    dialog = _dialog(tmp_path)
+    chosen = str(tmp_path / "chosen")
+    monkeypatch.setattr(
+        module.QFileDialog,
+        "getExistingDirectory",
+        staticmethod(lambda *_a, **_k: chosen),
+    )
+
+    dialog._browse_outdir()
+
+    assert dialog.output_dir == Path(chosen)
+
+
+def test_browse_outdir_leaves_the_field_alone_when_cancelled(
+    qt_app, scratch_settings, tmp_path: Path, monkeypatch
+) -> None:
+    from epy_export._ui import docs_export_dialog as module
+
+    dialog = _dialog(tmp_path)
+    original = dialog.output_dir
+    monkeypatch.setattr(
+        module.QFileDialog,
+        "getExistingDirectory",
+        staticmethod(lambda *_a, **_k: ""),
+    )
+
+    dialog._browse_outdir()
+
+    assert dialog.output_dir == original
+
+
+def test_a_widget_translator_is_applied_after_construction(
+    qt_app, scratch_settings, tmp_path: Path
+) -> None:
+    from epy_export._ui.docs_export_dialog import DocsExportDialog
+
+    source = tmp_path / "documento.md"
+    source.write_text("# T\n", encoding="utf-8")
+    seen: list[object] = []
+
+    dialog = DocsExportDialog(
+        source, app_name="epy_reports", translate_widget=seen.append,
+    )
+
+    assert seen == [dialog]
+
+
 def test_the_worker_reports_both_outcomes(
     qt_app, tmp_path: Path
 ) -> None:

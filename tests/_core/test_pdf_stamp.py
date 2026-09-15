@@ -234,3 +234,214 @@ def test_stamping_keeps_a_real_named_destination(
     )
     after = set(pypdf.PdfReader(str(destination_pdf)).named_destinations)
     assert after == before == {"intro"}
+
+
+# --- _roman -------------------------------------------------------------
+
+
+def test_roman_numerals_for_ordinary_page_numbers() -> None:
+    assert _pdf_stamp._roman(1) == "i"
+    assert _pdf_stamp._roman(4) == "iv"
+    assert _pdf_stamp._roman(14) == "xiv"
+    assert _pdf_stamp._roman(1994) == "mcmxciv"
+
+
+def test_roman_of_a_non_positive_number_is_its_own_string() -> None:
+    # Page numbering never reaches zero or negative in practice, but the
+    # function is defensive rather than silently producing an empty
+    # string, which would read as a page carrying no number at all.
+    assert _pdf_stamp._roman(0) == "0"
+    assert _pdf_stamp._roman(-3) == "-3"
+
+
+# --- extract_anchor_pages, the two failure paths ------------------------
+
+
+def test_a_destination_pypdf_cannot_place_is_skipped(
+    destination_pdf: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # "pypdf answers None for a destination it cannot place" -- the
+    # module docstring's own words for a case the real fixture cannot
+    # produce (its one destination resolves fine), so it is forced here.
+    monkeypatch.setattr(
+        pypdf.PdfReader,
+        "get_destination_page_number",
+        lambda self, dest: None,
+    )
+    assert _pdf_stamp.extract_anchor_pages(destination_pdf) == {}
+
+
+def test_a_corrupt_pdf_yields_no_anchors_instead_of_raising(
+    tmp_path: Path,
+) -> None:
+    broken = tmp_path / "broken.pdf"
+    broken.write_bytes(b"not a real PDF at all")
+    assert _pdf_stamp.extract_anchor_pages(broken) == {}
+
+
+# --- add_page_background, the two silent no-ops -------------------------
+
+
+def test_background_with_no_color_does_nothing(outlined_pdf: Path) -> None:
+    before = outlined_pdf.read_bytes()
+    _pdf_stamp.add_page_background(outlined_pdf, "")
+    assert outlined_pdf.read_bytes() == before
+
+
+def test_background_with_an_unparseable_color_does_nothing(
+    outlined_pdf: Path,
+) -> None:
+    before = outlined_pdf.read_bytes()
+    _pdf_stamp.add_page_background(outlined_pdf, "not-a-color")
+    assert outlined_pdf.read_bytes() == before
+
+
+# --- add_watermark, the missing-image no-op ------------------------------
+
+
+def test_watermark_with_a_missing_image_does_nothing(
+    outlined_pdf: Path, tmp_path: Path
+) -> None:
+    before = outlined_pdf.read_bytes()
+    _pdf_stamp.add_watermark(outlined_pdf, tmp_path / "absent.png")
+    assert outlined_pdf.read_bytes() == before
+
+
+# --- _page_stamp, both numbering schemes ---------------------------------
+
+
+def test_page_stamp_with_segments_restarts_numbering_per_section() -> None:
+    # Page 1-2 roman front matter; page 3+ arabic body, restarting at 1.
+    segments = [(1, "roman"), (3, "arabic")]
+    assert _pdf_stamp._page_stamp(1, 1, 10, "en", segments, True) == (
+        True, "i",
+    )
+    assert _pdf_stamp._page_stamp(2, 1, 10, "en", segments, True) == (
+        True, "ii",
+    )
+    assert _pdf_stamp._page_stamp(3, 1, 10, "en", segments, True) == (
+        True, "1",
+    )
+    assert _pdf_stamp._page_stamp(4, 1, 10, "en", segments, True) == (
+        True, "2",
+    )
+
+
+def test_page_stamp_with_segments_and_numbers_off_still_stamps() -> None:
+    segments = [(1, "roman")]
+    assert _pdf_stamp._page_stamp(1, 1, 10, "en", segments, False) == (
+        True, None,
+    )
+
+
+def test_page_stamp_before_the_first_segment_is_unstamped() -> None:
+    segments = [(3, "arabic")]
+    assert _pdf_stamp._page_stamp(1, 1, 10, "en", segments, True) == (
+        False, None,
+    )
+
+
+def test_page_stamp_without_segments_and_numbers_off_still_stamps() -> None:
+    assert _pdf_stamp._page_stamp(2, 1, 5, "en", None, False) == (
+        True, None,
+    )
+
+
+def test_page_stamp_without_segments_before_start_is_unstamped() -> None:
+    assert _pdf_stamp._page_stamp(1, 3, 5, "en", None, True) == (
+        False, None,
+    )
+
+
+# --- add_footer, the nothing-to-stamp no-op ------------------------------
+
+
+def test_footer_with_nothing_to_stamp_does_nothing(
+    outlined_pdf: Path,
+) -> None:
+    before = outlined_pdf.read_bytes()
+    _pdf_stamp.add_footer(outlined_pdf, "", page_numbers=False)
+    assert outlined_pdf.read_bytes() == before
+
+
+# --- add_header ------------------------------------------------------
+
+
+def test_header_with_no_cells_does_nothing(outlined_pdf: Path) -> None:
+    before = outlined_pdf.read_bytes()
+    _pdf_stamp.add_header(outlined_pdf, ["", "", ""])
+    assert outlined_pdf.read_bytes() == before
+
+
+def test_header_skips_pages_before_start_page(outlined_pdf: Path) -> None:
+    # outlined_pdf carries 3 pages; start_page=2 must leave page 1 alone.
+    _pdf_stamp.add_header(
+        outlined_pdf, ["LEFT", "MID", "RIGHT"], start_page=2
+    )
+    reader = pypdf.PdfReader(str(outlined_pdf))
+    texts = [page.extract_text() for page in reader.pages]
+    assert "LEFT" not in texts[0]
+    assert "LEFT" in texts[1]
+    assert "LEFT" in texts[2]
+
+
+def test_header_with_six_cells_draws_a_second_row(outlined_pdf: Path) -> None:
+    _pdf_stamp.add_header(outlined_pdf, ["A", "B", "C", "D", "E", "F"])
+    text = pypdf.PdfReader(str(outlined_pdf)).pages[0].extract_text()
+    assert "D" in text
+    assert "E" in text
+    assert "F" in text
+
+
+def test_header_skips_an_empty_cell_within_the_grid(
+    outlined_pdf: Path,
+) -> None:
+    _pdf_stamp.add_header(outlined_pdf, ["A", "", "C"])
+    text = pypdf.PdfReader(str(outlined_pdf)).pages[0].extract_text()
+    assert "A" in text
+    assert "C" in text
+
+
+# --- add_metadata, the optional fields ------------------------------------
+
+
+def test_metadata_writes_subject_and_keywords_when_given(
+    outlined_pdf: Path,
+) -> None:
+    _pdf_stamp.add_metadata(
+        outlined_pdf,
+        subject="Structural report",
+        keywords="concrete, seismic",
+        creator="epy_export",
+        producer="epy_export",
+    )
+    info = pypdf.PdfReader(str(outlined_pdf)).metadata
+    assert info is not None
+    assert info["/Subject"] == "Structural report"
+    assert info["/Keywords"] == "concrete, seismic"
+
+
+# --- _fit_to --------------------------------------------------------------
+
+
+def test_fit_to_skips_a_page_with_a_degenerate_mediabox() -> None:
+    class _Box:
+        def __init__(self, width: float, height: float) -> None:
+            self.width = width
+            self.height = height
+
+    class _Page:
+        def __init__(self, width: float, height: float) -> None:
+            self.mediabox = _Box(width, height)
+            self.scaled = False
+
+        def scale_by(self, _factor: float) -> None:
+            self.scaled = True
+
+    zero_width = _Page(0, 500)
+    normal = _Page(400, 500)
+
+    _pdf_stamp._fit_to([zero_width, normal], 400.0, 600.0)
+
+    assert zero_width.scaled is False
+    assert normal.scaled is True

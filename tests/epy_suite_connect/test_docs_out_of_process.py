@@ -273,6 +273,37 @@ def test_an_absent_bibliography_is_refused_before_anything_runs(
         )
 
 
+def test_an_absent_csl_is_refused_before_anything_runs(
+    tmp_path: Path, source: Path
+) -> None:
+    # Symmetric with the bibliography check above -- nothing exercised
+    # the csl branch at all before this, present or absent.
+    with pytest.raises(ValueError, match="CSL file not found"):
+        _docs._job(
+            source, tmp_path, ("pdf",), OPTS,
+            document_type="report", title=None, client=None, footer="",
+            bibliography=None, csl=tmp_path / "absent.csl",
+        )
+
+
+def test_a_present_bibliography_and_csl_both_reach_the_job(
+    tmp_path: Path, source: Path
+) -> None:
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{x,}", encoding="utf-8")
+    csl = tmp_path / "style.csl"
+    csl.write_text("<style/>", encoding="utf-8")
+
+    job = _docs._job(
+        source, tmp_path, ("pdf",), OPTS,
+        document_type="report", title=None, client=None, footer="",
+        bibliography=bib, csl=csl,
+    )
+
+    assert job["generate"]["bibliography_path"] == str(bib)
+    assert job["generate"]["csl_path"] == str(csl)
+
+
 def test_the_job_is_json_serialisable(tmp_path: Path, source: Path) -> None:
     # It crosses a process boundary as JSON. A value that is not
     # serialisable would fail at the boundary and nowhere else, so it
@@ -340,3 +371,93 @@ def test_a_document_kind_nobody_publishes_is_refused(
             formats=["html"],
             options=RenderOptions(document_type="memorandum"),
         )
+
+
+# --------------------------------------------------- refuse_latex_errors
+
+
+def test_refuse_latex_errors_is_quiet_on_a_clean_log(tmp_path: Path) -> None:
+    log = tmp_path / "clean.log"
+    log.write_text("Output written on doc.pdf (3 pages).\n", encoding="utf-8")
+    _docs.refuse_latex_errors(log)  # must not raise
+
+
+def test_refuse_latex_errors_raises_naming_the_first_error(
+    tmp_path: Path,
+) -> None:
+    log = tmp_path / "broken.log"
+    log.write_text(
+        "Some preamble text.\n"
+        "! Undefined control sequence.\n"
+        "! Missing $ inserted.\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(_docs.RenderFailedError, match="Undefined control"):
+        _docs.refuse_latex_errors(log)
+
+
+def test_refuse_latex_errors_treats_an_unreadable_log_as_nothing_to_judge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    log = tmp_path / "locked.log"
+    log.write_text("x", encoding="utf-8")
+
+    def _raise(self: Path, *_a: object, **_k: object) -> str:
+        raise OSError("locked by another process")
+
+    monkeypatch.setattr(Path, "read_text", _raise)
+
+    _docs.refuse_latex_errors(log)  # must not raise
+
+
+# ------------------------------------------------------- staged_for_latex
+
+
+def test_staged_for_latex_writes_a_repaired_copy_when_needed(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "doc.md"
+    source.write_text(r"Energy: \(E = mc^2\)", encoding="utf-8")
+
+    staged, repaired = _docs.staged_for_latex(source, tmp_path)
+
+    assert repaired > 0
+    assert staged != source
+    assert staged.parent.name == "_staged"
+    assert staged.read_text(encoding="utf-8") == "Energy: $E = mc^2$"
+    # A COPY, never the source: the original stays exactly as written.
+    assert source.read_text(encoding="utf-8") == r"Energy: \(E = mc^2\)"
+
+
+def test_staged_for_latex_is_the_source_itself_when_nothing_needs_fixing(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "doc.md"
+    source.write_text("Already $clean$.", encoding="utf-8")
+
+    staged, repaired = _docs.staged_for_latex(source, tmp_path)
+
+    assert repaired == 0
+    assert staged == source
+
+
+# ------------------------------------------------------- _out_of_process
+
+
+def test_a_child_that_cannot_be_started_is_reported_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source: Path
+) -> None:
+    # subprocess.run itself refusing to start the interpreter (missing
+    # executable, permissions) is a different failure from a child that
+    # started and then timed out or exited non-zero.
+    monkeypatch.setattr(_backends, "backend_present", lambda module: False)
+    monkeypatch.setattr(_docs, "backend_route", _backends.backend_route)
+    monkeypatch.setenv(_backends.ENV_DOCS_PYTHON, sys.executable)
+
+    def _raise(*_a: object, **_k: object) -> None:
+        raise OSError("no such file or directory")
+
+    monkeypatch.setattr(_docs.subprocess, "run", _raise)
+
+    with pytest.raises(_docs.RenderFailedError, match="could not be started"):
+        _docs.emit_all(SPEC, source, tmp_path / "out", ("pdf",), OPTS)

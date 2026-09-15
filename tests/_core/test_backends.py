@@ -26,6 +26,21 @@ def test_asking_does_not_import(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "wave" not in sys.modules
 
 
+def test_a_broken_cached_module_is_reported_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # find_spec raises ValueError for a module already in sys.modules
+    # whose __spec__ is None -- state a manually constructed module
+    # object (or a partially torn-down import) can leave behind.
+    import types
+
+    broken = types.ModuleType("epy_broken_spec")
+    broken.__spec__ = None
+    monkeypatch.setitem(sys.modules, "epy_broken_spec", broken)
+
+    assert not _backends.backend_present("epy_broken_spec")
+
+
 def test_a_bare_directory_is_not_a_backend(tmp_path, monkeypatch) -> None:
     # A namespace package -- any directory of that name on the path,
     # PEP 420 -- satisfies find_spec and imports to an empty module, so
