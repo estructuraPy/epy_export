@@ -89,6 +89,7 @@ __author__ = "Ing. Angel Navarro-Mora M.Sc."
 __all__ = [
     "APPEARANCES",
     "DOCUMENT_TYPES",
+    "DocsExportDialog",
     "ENV_DOCS_PYTHON",
     "BackendUnavailableError",
     "ENGINES",
@@ -97,6 +98,7 @@ __all__ = [
     "LEGACY_ORGANIZATIONS",
     "ORGANIZATION",
     "RenderFailedError",
+    "RenderWorker",
     "RenderOptions",
     "Route",
     "add_footer",
@@ -131,3 +133,20 @@ __all__ = [
     "wait_until",
     "write_text_atomic",
 ]
+
+#: Qt is NOT imported when this package is. Every consuming library calls
+#: ``pin_system_icu()`` from its own ``__init__`` and PySide6 only loads
+#: correctly AFTER that call, so importing the dialog eagerly here would
+#: pull Qt in before any consumer could pin, and break the pin suite-wide.
+#: These two are therefore published lazily (PEP 562): the names are part
+#: of the public API, the import cost is paid by whoever touches them.
+_QT_EXPORTS = frozenset({"DocsExportDialog", "RenderWorker"})
+
+
+def __getattr__(name: str) -> object:
+    """Resolve the Qt-backed exports on first use."""
+    if name in _QT_EXPORTS:
+        from epy_export._ui import docs_export_dialog
+
+        return getattr(docs_export_dialog, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
