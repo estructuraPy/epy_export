@@ -30,6 +30,7 @@ wants to read a document's front matter pays nothing for the rest.
 
 from __future__ import annotations
 
+from ._core import _backends as backends
 from ._core._backends import (
     ENV_DOCS_PYTHON,
     BackendUnavailableError,
@@ -68,6 +69,7 @@ from ._core._qt_print import (
     wait_until,
 )
 from ._core._runtime import pin_system_icu
+from .epy_suite_connect._adapters import _docs as docs_adapter
 from .epy_suite_connect._adapters._adapter import (
     available,
     installed,
@@ -110,6 +112,9 @@ __all__ = [
     "available",
     "backend_present",
     "backend_route",
+    "backends",
+    "docs_adapter",
+    "docs_export_dialog",
     "engine",
     "engine_ids",
     "eval_js",
@@ -145,6 +150,10 @@ _QT_EXPORTS = frozenset({"DocsExportDialog", "RenderWorker"})
 
 def __getattr__(name: str) -> object:
     """Resolve the Qt-backed exports on first use."""
+    if name == "docs_export_dialog":
+        from epy_export._ui import docs_export_dialog
+
+        return docs_export_dialog
     if name in _QT_EXPORTS:
         from epy_export._ui import docs_export_dialog
 
