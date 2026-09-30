@@ -10,7 +10,7 @@ naming which engine turns a source into which format.
 
 The measured starting point: ``_pdf_footer`` existed twice as 546 lines
 differing in eight, all of them comment text; the front-matter parser
-existed twice byte for byte; the ICU workaround three times, two of its
+existed twice byte for byte; the ICU pin three times, two of its
 copies documenting that they mirrored the first; and the bridge to
 epy_docs twice, incompatibly, with two of the four apps unable to reach
 it at all. A fix to any one of those reached the others only if somebody

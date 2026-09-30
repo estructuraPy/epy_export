@@ -281,7 +281,7 @@ def _page_stamp(
     With ``segments`` (sorted ``(start_page, style)`` boundaries), each
     section numbers from 1 in its own style (``roman`` or ``arabic``),
     restarting at every boundary; pages before the first boundary are
-    unnumbered front matter. Without segments, the legacy single-run
+    unnumbered front matter. Without segments, the single-run
     behaviour applies: Arabic "Page X of Y" from ``start_page``.
     """
     if segments:

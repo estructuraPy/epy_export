@@ -1,6 +1,6 @@
 """Make the process safe for Qt to load, before Qt loads.
 
-One owner for a workaround that lived three times -- in epy_reports,
+One owner for the ICU pin that lived three times -- in epy_reports,
 epy_slides and epy_papers -- each with its own copy of the same
 docstring, two of which said "Mirrors epy_reports._pin_system_icu".
 Self-documented triplication is still triplication.

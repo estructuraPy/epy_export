@@ -6,7 +6,7 @@ and ``ANM Ingenieria`` (epy_draft, ePy Studio). On Windows those are two
 registry trees, so the Studio selector -- which reads the language the
 person already chose in an editor so it does not ask again -- never
 found what three of the four editors had saved, and asked anyway. One
-constant here, imported by all five, is what ends that; the legacy
+constant here, imported by all five, is what ends that; the previous
 spelling stays named so a first start after the change can copy what
 was stored under it.
 """
