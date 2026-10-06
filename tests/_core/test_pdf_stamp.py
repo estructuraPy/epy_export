@@ -22,12 +22,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pypdf
 import pytest
 
 from epy_export._core import _pdf_stamp
-
-pypdf = pytest.importorskip("pypdf")
-pytest.importorskip("reportlab")
 
 
 @pytest.fixture

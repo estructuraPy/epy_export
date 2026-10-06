@@ -20,10 +20,9 @@ from epy_export._core._runtime import pin_system_icu
 # import at all until ICU is pinned -- which is exactly what that
 # function is for. Calling it here is the demonstration: measured, the
 # import below fails with WinError 127 without this line and succeeds
-# with it. importorskip stays as the honest answer for a machine with
-# no PySide6 at all.
+# with it.
 pin_system_icu()
-pytest.importorskip("PySide6.QtCore", exc_type=ImportError)
+import PySide6.QtCore  # noqa: E402, F401 - the ICU pin's demonstration
 
 
 class _FakeApp:
