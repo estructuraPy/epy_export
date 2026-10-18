@@ -29,12 +29,13 @@ APPEARANCES: tuple[str, ...] = (
     "handwritten",
     "minimal",
     "professional",
+    "quotation",
     "scientific",
     "technical",
 )
 """The layout vocabulary shared across the family.
 
-Nine names a user learns once and knows everywhere. This tuple is the
+Ten names a user learns once and knows everywhere. This tuple is the
 answer for a machine with no engine installed to publish its own; where
 an engine does publish one, the adapter asks it rather than trusting
 this copy.

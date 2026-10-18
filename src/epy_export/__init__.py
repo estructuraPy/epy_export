@@ -69,6 +69,9 @@ from ._core._qt_print import (
     wait_until,
 )
 from ._core._runtime import pin_system_icu
+from ._ui._theme import DEFAULT_THEME
+from ._ui._theme import apply as apply_theme
+from ._ui._theme import names as theme_names
 from .epy_suite_connect._adapters import _docs as docs_adapter
 from .epy_suite_connect._adapters._adapter import (
     available,
@@ -91,6 +94,7 @@ __author__ = "Ing. Angel Navarro-Mora M.Sc."
 __all__ = [
     "APPEARANCES",
     "DOCUMENT_TYPES",
+    "DEFAULT_THEME",
     "DocsExportDialog",
     "ENV_DOCS_PYTHON",
     "BackendUnavailableError",
@@ -109,6 +113,7 @@ __all__ = [
     "add_page_background",
     "add_watermark",
     "append_pdf",
+    "apply_theme",
     "available",
     "backend_present",
     "backend_route",
@@ -134,6 +139,7 @@ __all__ = [
     "scale_pages_to_width",
     "set_metadata_field",
     "strip_front_matter",
+    "theme_names",
     "understood_by",
     "wait_until",
     "write_text_atomic",

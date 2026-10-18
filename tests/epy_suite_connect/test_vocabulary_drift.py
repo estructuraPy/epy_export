@@ -17,7 +17,7 @@ def test_the_vocabularies_are_pinned() -> None:
     # only checked against something else is not pinned at all.
     assert APPEARANCES == (
         "academic", "classic", "corporate", "creative", "handwritten",
-        "minimal", "professional", "scientific", "technical",
+        "minimal", "professional", "quotation", "scientific", "technical",
     )
     assert DOCUMENT_TYPES == ("report", "paper", "book", "notebook")
 
