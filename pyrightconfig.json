@@ -6,7 +6,8 @@
   "exclude": [
     "**/__pycache__",
     "**/.venv",
-    "examples"
+    "examples",
+    "src/*/epy_suite_connect/_packaging"
   ],
   "typeCheckingMode": "standard",
   "pythonVersion": "3.10",
