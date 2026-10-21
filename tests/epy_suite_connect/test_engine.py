@@ -21,6 +21,7 @@ that cannot be read off either piece alone.
 from __future__ import annotations
 
 import dataclasses
+from typing import Any, cast
 
 import pytest
 
@@ -54,7 +55,7 @@ def test_named_fields_names_exactly_the_field_that_was_set(
     field: str, value: object
 ) -> None:
     """Setting one field names that one and no other."""
-    options = _engine.RenderOptions(**{field: value})
+    options = _engine.RenderOptions(**cast("dict[str, Any]", {field: value}))
     assert options.named_fields() == (field,)
 
 
@@ -83,7 +84,9 @@ def test_named_fields_can_report_every_field_the_dataclass_declares() -> None:
     reportable = {
         field
         for field, value in NON_DEFAULT
-        if _engine.RenderOptions(**{field: value}).named_fields() == (field,)
+        if _engine.RenderOptions(
+            **cast("dict[str, Any]", {field: value})
+        ).named_fields() == (field,)
     }
     assert reportable == declared
 

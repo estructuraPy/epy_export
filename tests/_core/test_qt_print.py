@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -119,7 +120,7 @@ def test_javascript_pumps_while_the_answer_is_pending() -> None:
         def processEvents(self, *_a, **_k) -> None:  # noqa: N802
             pumped["count"] += 1
             if pumped["count"] == 2:
-                delivered["callback"]("answer")
+                cast("Callable[[str], Any]", delivered["callback"])("answer")
 
     result = _qt_print.eval_js(
         _SlowApp(), _DeferredPage(), "window.ready", timeout_ms=5000

@@ -30,6 +30,8 @@ wants to read a document's front matter pays nothing for the rest.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ._core import _backends as backends
 from ._core._backends import (
     ENV_DOCS_PYTHON,
@@ -90,6 +92,14 @@ from .epy_suite_connect._data._catalog import ENGINES, engine, engine_ids
 
 __version__ = "0.4.0"
 __author__ = "Ing. Angel Navarro-Mora M.Sc."
+
+if TYPE_CHECKING:
+    from epy_export._ui import docs_export_dialog
+    from epy_export._ui.docs_export_dialog import (
+        DocsExportDialog,
+        RenderWorker,
+    )
+
 
 __all__ = [
     "APPEARANCES",

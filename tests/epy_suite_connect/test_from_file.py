@@ -8,6 +8,7 @@ is exercised against a stand-in module returned by a mocked
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -28,7 +29,7 @@ def _engine(**overrides: object) -> Engine:
         "purpose": "x",
     }
     defaults.update(overrides)
-    return Engine(**defaults)
+    return Engine(**cast("dict[str, Any]", defaults))
 
 
 def test_a_themed_engine_opens_with_the_chosen_appearance(
