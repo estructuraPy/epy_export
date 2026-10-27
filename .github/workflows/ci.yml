@@ -114,6 +114,22 @@ jobs:
       # on unresolved imports that are not type errors at all.
       - name: Install package + every extra
         run: pip install -e ".[dev,pdf,qt]"
+
+      - name: Install the peer extras this repo declares
+        # Every extra naming a suite repository (deploy, suite, simulation,
+        # ...) is a PEER the tests and notebooks import; installing the package
+        # alone does not pull them. The git URLs resolve to the mirrors.
+        # ifcopenshell is pulled only when the tests mention it.
+        shell: bash
+        run: |
+          set -e
+          if grep -qs "ifcopenshell" -r tests; then
+            python -m pip install ifcopenshell
+          fi
+          SPECS=$(grep -oE '"epy[_-][A-Za-z0-9_-]+ @ git\+https://github\.com/estructuraPy/[A-Za-z0-9_.-]+"' pyproject.toml || true)
+          printf '%s\n' "$SPECS" | tr -d '"' | sort -u | while IFS= read -r spec; do
+            [ -n "$spec" ] && python -m pip install "$spec"
+          done
       - name: Install pyright
         run: npm install -g pyright
       # pyrightconfig.json pins pythonPlatform to Windows so this job and
