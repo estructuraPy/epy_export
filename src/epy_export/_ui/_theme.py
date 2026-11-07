@@ -89,7 +89,7 @@ _TEMPLATE = """
 QWidget {{
     background: {surface};
     color: {text};
-    font-size: 13px;
+    font-size: 10pt;
 }}
 QMainWindow, QDialog {{
     background: {surface_alt};
@@ -97,6 +97,10 @@ QMainWindow, QDialog {{
 QMenuBar, QMenu, QStatusBar {{
     background: {surface};
     color: {text};
+}}
+QStatusBar {{
+    color: {muted};
+    border-top: 1px solid {border};
 }}
 QMenuBar::item:selected, QMenu::item:selected {{
     background: {surface_alt};
@@ -256,7 +260,7 @@ QLabel#AppTitle {{
 }}
 QLabel#AppSubtitle {{
     color: {muted};
-    font-size: 13px;
+    font-size: 10pt;
 }}
 QPushButton#Primary {{
     background: {primary};
@@ -267,6 +271,81 @@ QPushButton#Primary {{
 QPushButton#Primary:hover {{
     background: {accent};
     border-color: {accent};
+}}
+
+QToolBar {{
+    background: {surface};
+    border: none;
+    border-bottom: 1px solid {border};
+    padding: 7px 10px;
+    spacing: 3px;
+}}
+QToolBar::separator {{
+    background: {border};
+    width: 1px;
+    margin: 6px 8px;
+}}
+QToolButton {{
+    background: transparent;
+    color: {text};
+    border: none;
+    border-radius: 7px;
+    padding: 7px 12px;
+}}
+QToolButton:hover {{
+    background: {surface_alt};
+    color: {primary};
+}}
+QToolButton:pressed {{
+    background: {border};
+}}
+QToolButton:checked {{
+    background: {surface_alt};
+    color: {primary};
+}}
+QToolButton::menu-indicator {{
+    image: none;
+    width: 0;
+}}
+QFrame#HeaderCard {{
+    background: {surface};
+    border: 1px solid {border};
+    border-radius: 16px;
+}}
+QFrame#Footer {{
+    background: {surface_alt};
+    border: 1px solid {border};
+    border-radius: 12px;
+}}
+QLabel#Eyebrow {{
+    color: {accent};
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}}
+QLabel#SectionTitle {{
+    color: {primary};
+    font-size: 16px;
+    font-weight: 700;
+}}
+QLabel#Muted {{
+    color: {muted};
+    font-size: 10pt;
+}}
+QDialog QLabel#DialogTitle {{
+    color: {primary};
+    font-size: 20px;
+    font-weight: 700;
+}}
+QPushButton#Quiet {{
+    background: transparent;
+    color: {muted};
+    border: none;
+    padding: 6px 10px;
+}}
+QPushButton#Quiet:hover {{
+    background: {surface_alt};
+    color: {primary};
 }}
 """
 
