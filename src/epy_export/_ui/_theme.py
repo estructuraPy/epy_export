@@ -17,13 +17,32 @@ from a package that never draws anything.
 
 from __future__ import annotations
 
+import json
+import os
+import re
+from pathlib import Path
+from typing import Any
+
 __all__ = [
     "DEFAULT_THEME",
     "PALETTES",
     "apply",
+    "apply_chrome",
+    "bundled_names",
+    "delete_user_theme",
+    "display_name",
+    "is_user_theme",
     "names",
     "palette",
     "qss",
+    "reload_user_themes",
+    "save_user_theme",
+    "user_theme_ids",
+    "user_themes_dir",
+    "namespace",
+    "use_namespace",
+    "document_layout",
+    "validate_palette",
 ]
 
 Theme = dict[str, str]
@@ -79,11 +98,272 @@ PALETTES: dict[str, Theme] = {
         "border": "#c9dede",
         "on_primary": "#ffffff",
     },
+    "craft": {
+        "primary": "#0b1b3a",
+        "accent": "#1d5fd1",
+        "surface": "#ffffff",
+        "surface_alt": "#e9eef6",
+        "text": "#0f172a",
+        "muted": "#475569",
+        "border": "#7c8da8",
+        "on_primary": "#ffffff",
+    },
+    "handwritten": {
+        "primary": "#464646",
+        "accent": "#696969",
+        "surface": "#f0f0f0",
+        "surface_alt": "#ebe6d7",
+        "text": "#323232",
+        "muted": "#5a5a5a",
+        "border": "#a9a9a9",
+        "on_primary": "#ffffff",
+    },
+    "creative": {
+        "primary": "#6d28d9",
+        "accent": "#f59e0b",
+        "surface": "#fffdf9",
+        "surface_alt": "#f5edff",
+        "text": "#241b32",
+        "muted": "#6b5b7a",
+        "border": "#c9b6e4",
+        "on_primary": "#ffffff",
+    },
+    "professional": {
+        "primary": "#1e3a5f",
+        "accent": "#2f7d8c",
+        "surface": "#ffffff",
+        "surface_alt": "#eef3f7",
+        "text": "#14202b",
+        "muted": "#536575",
+        "border": "#b9c8d4",
+        "on_primary": "#ffffff",
+    },
+    "scientific": {
+        "primary": "#12355b",
+        "accent": "#0f8b8d",
+        "surface": "#ffffff",
+        "surface_alt": "#edf5f7",
+        "text": "#102a3a",
+        "muted": "#526b78",
+        "border": "#b8d2d8",
+        "on_primary": "#ffffff",
+    },
+    "quotation": {
+        "primary": "#7a1f3d",
+        "accent": "#b8862b",
+        "surface": "#fffdf8",
+        "surface_alt": "#f7efe4",
+        "text": "#2d1b20",
+        "muted": "#725b58",
+        "border": "#d8c3b6",
+        "on_primary": "#ffffff",
+    },
+    "craft_dark": {
+        "primary": "#e3ebff",
+        "accent": "#7aa7ff",
+        "surface": "#111827",
+        "surface_alt": "#0d1728",
+        "text": "#f1f5fb",
+        "muted": "#b4c2d7",
+        "border": "#3a4c68",
+        "on_primary": "#0b1b3a",
+    },
 }
 """Theme name -> colour table. The names are the standard layout names."""
 
-DEFAULT_THEME = "corporate"
+DEFAULT_THEME = "craft"
 """What a window uses until the reader picks another."""
+
+PALETTE_KEYS = (
+    "primary",
+    "accent",
+    "surface",
+    "surface_alt",
+    "text",
+    "muted",
+    "border",
+    "on_primary",
+)
+"""Every colour a complete suite theme declares."""
+
+USER_THEMES: dict[str, Theme] = {}
+"""Custom themes loaded from the active application directory."""
+
+_NAMESPACE = ""
+"""Which application owns the active custom-theme catalogue."""
+
+
+def use_namespace(namespace: str) -> None:
+    """Select one application's private theme catalogue."""
+    global _NAMESPACE
+    _NAMESPACE = namespace.strip()
+    reload_user_themes()
+
+
+def namespace() -> str:
+    """Return the application that owns the active catalogue."""
+    return _NAMESPACE
+
+
+def _safe_stem(name: str) -> str:
+    """Turn a display name into a stable file stem."""
+    stem = re.sub(r"[^a-zA-Z0-9._-]+", "-", name.strip().lower())
+    return stem.strip("-._") or "custom-theme"
+
+
+def user_themes_dir() -> Path:
+    """Return the shared user-theme directory."""
+    override = os.environ.get("EPY_SUITE_THEMES_DIR", "").strip()
+    if override:
+        root = Path(override)
+    else:
+        base = os.environ.get("APPDATA")
+        home = Path(base) if base else Path.home() / "AppData" / "Roaming"
+        root = home / "ePy Suite" / "themes"
+    return root / _NAMESPACE if _NAMESPACE else root
+
+
+def validate_palette(colors: dict[str, str]) -> dict[str, str]:
+    """Return a complete palette or raise ``ValueError``."""
+    clean: dict[str, str] = {}
+    for key in PALETTE_KEYS:
+        value = str(colors.get(key, "")).strip()
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+            raise ValueError(f"invalid colour for {key}: {value!r}")
+        clean[key] = value
+    return clean
+
+
+def _read_theme(path: Path) -> tuple[str, str, Theme] | None:
+    """Read one user theme file, returning ``(id, name, palette)``."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    colors = raw.get("palette")
+    if not isinstance(colors, dict):
+        return None
+    try:
+        palette = validate_palette(colors)
+    except ValueError:
+        return None
+    name = str(raw.get("display_name") or path.stem).strip()
+    layout = str(raw.get("document_layout") or "corporate").strip()
+    return path.stem, name or path.stem, palette, layout
+
+
+def reload_user_themes() -> dict[str, Theme]:
+    """Reload the shared custom-theme catalogue."""
+    USER_THEMES.clear()
+    USER_NAMES.clear()
+    USER_LAYOUTS.clear()
+    directory = user_themes_dir()
+    if directory.is_dir():
+        for path in sorted(directory.glob("*.json")):
+            loaded = _read_theme(path)
+            if loaded is None:
+                continue
+            theme_id, name, colors, layout = loaded
+            USER_THEMES[theme_id] = colors
+            USER_NAMES[theme_id] = name
+            USER_LAYOUTS[theme_id] = layout
+    return USER_THEMES
+
+
+USER_NAMES: dict[str, str] = {}
+"""Custom theme id -> display name."""
+
+USER_LAYOUTS: dict[str, str] = {}
+"""Custom theme id -> epy_docs document layout."""
+
+
+def bundled_names() -> list[str]:
+    """Return the bundled palette names, in catalogue order."""
+    return list(PALETTES)
+
+
+_DOCUMENT_LAYOUTS = {
+    "academic",
+    "classic",
+    "corporate",
+    "creative",
+    "handwritten",
+    "minimal",
+    "professional",
+    "quotation",
+    "scientific",
+    "technical",
+}
+
+
+def document_layout(name: str) -> str:
+    """Return the epy_docs layout a theme carries."""
+    if name in USER_LAYOUTS:
+        return USER_LAYOUTS[name]
+    if name in _DOCUMENT_LAYOUTS:
+        return name
+    return "corporate"
+
+
+def names() -> list[str]:
+    """Return bundled and custom theme names."""
+    return bundled_names() + [
+        name for name in USER_THEMES if name not in PALETTES
+    ]
+
+
+def display_name(name: str) -> str:
+    """Return the visible name of a bundled or custom theme."""
+    return USER_NAMES.get(name) or name.replace("_", " ").title()
+
+
+def is_user_theme(name: str) -> bool:
+    """Whether ``name`` belongs to the user catalogue."""
+    return name in USER_THEMES and name not in PALETTES
+
+
+def user_theme_ids() -> set[str]:
+    """Return the ids of the custom themes."""
+    return set(USER_THEMES)
+
+
+def save_user_theme(
+    name: str,
+    colors: dict[str, str],
+    *,
+    theme_id: str | None = None,
+    document_layout: str = "corporate",
+) -> str:
+    """Persist one custom theme and return its id."""
+    palette = validate_palette(colors)
+    clean_name = name.strip()
+    if not clean_name:
+        raise ValueError("a theme needs a display name")
+    chosen = _safe_stem(theme_id or clean_name)
+    if chosen in PALETTES:
+        raise ValueError(f"{chosen!r} is a bundled theme")
+    directory = user_themes_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, Any] = {
+        "id": chosen,
+        "display_name": clean_name,
+        "palette": palette,
+        "document_layout": document_layout or "corporate",
+    }
+    (directory / f"{chosen}.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    reload_user_themes()
+    return chosen
+
+
+def delete_user_theme(theme_id: str) -> None:
+    """Delete one custom theme from the shared catalogue."""
+    if theme_id in PALETTES:
+        raise ValueError("bundled themes cannot be deleted")
+    (user_themes_dir() / f"{theme_id}.json").unlink(missing_ok=True)
+    reload_user_themes()
 
 _TEMPLATE = """
 QWidget {{
@@ -347,16 +627,64 @@ QPushButton#Quiet:hover {{
     background: {surface_alt};
     color: {primary};
 }}
+QWidget#AppHeader {{
+    background: {surface};
+    border-bottom: 1px solid {border};
+}}
+QLabel#AppHeaderLogo {{
+    background: transparent;
+    border-radius: 9px;
+}}
+QLabel#AppHeaderTitle {{
+    color: {primary};
+    font-size: 15px;
+    font-weight: 800;
+}}
+QLabel#AppHeaderSubtitle {{
+    color: {muted};
+    font-size: 10pt;
+}}
+QDockWidget {{
+    color: {text};
+    titlebar-close-icon: none;
+    titlebar-normal-icon: none;
+}}
+QDockWidget::title {{
+    background: {surface_alt};
+    color: {muted};
+    padding: 7px 10px;
+    border-bottom: 1px solid {border};
+    font-weight: 600;
+}}
+QGroupBox {{
+    background: {surface};
+    border: 1px solid {border};
+    border-radius: 10px;
+    margin-top: 12px;
+    padding-top: 10px;
+    font-weight: 700;
+    color: {primary};
+}}
+QGroupBox::title {{
+    subcontrol-origin: margin;
+    left: 12px;
+    padding: 0 5px;
+}}
+QCheckBox {{
+    spacing: 8px;
+}}
+QProgressBar {{
+    background: {surface_alt};
+    border: 1px solid {border};
+    border-radius: 4px;
+    text-align: center;
+    color: {muted};
+}}
+QProgressBar::chunk {{
+    background: {accent};
+    border-radius: 4px;
+}}
 """
-
-
-def names() -> list[str]:
-    """Return the theme names, in catalog order.
-
-    Returns:
-        The palette names the interface may offer.
-    """
-    return list(PALETTES)
 
 
 def palette(name: str) -> Theme:
@@ -370,7 +698,11 @@ def palette(name: str) -> Theme:
         An unknown name is a stale stored choice, not an error worth
         refusing to draw a window over.
     """
-    return dict(PALETTES.get(name, PALETTES[DEFAULT_THEME]))
+    return dict(
+        USER_THEMES.get(
+            name, PALETTES.get(name, PALETTES[DEFAULT_THEME])
+        )
+    )
 
 
 def qss(name: str = DEFAULT_THEME) -> str:
@@ -399,3 +731,25 @@ def apply(app: object, name: str = DEFAULT_THEME) -> None:
         # import) has nothing to paint; a missing app is not an error.
         return
     app.setStyleSheet(qss(name))  # type: ignore[attr-defined]
+
+
+_CHROME_MARKER = "/* ePy craft chrome */"
+
+
+def apply_chrome(app: object, name: str = DEFAULT_THEME) -> None:
+    """Append the modern chrome over an application's document theme.
+
+    Reports, Slides and Papers paint their document theme through their
+    own catalogue. The chrome still needs one family look, so this adds
+    the shared stylesheet after the document stylesheet without touching
+    the document CSS. Re-applying replaces the previous chrome block
+    instead of growing the stylesheet.
+    """
+    if app is None:
+        return
+    current = getattr(app, "styleSheet", lambda: "")()
+    base = current.split(_CHROME_MARKER, 1)[0]
+    app.setStyleSheet(base + _CHROME_MARKER + qss(name))  # type: ignore[attr-defined]
+
+
+reload_user_themes()
