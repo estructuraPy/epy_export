@@ -22,6 +22,7 @@ __all__ = [
     "FORMAT_VERSION",
     "MANIFEST_NAME",
     "ZEPY_SUFFIX",
+    "first_markdown",
     "open_folder",
     "pack",
     "read_manifest",
@@ -146,12 +147,26 @@ def read_manifest(path: str | Path) -> dict[str, Any]:
     archive = Path(path)
     try:
         with zipfile.ZipFile(archive) as handle:
-            body = json.loads(handle.read(MANIFEST_NAME).decode("utf-8"))
+            names = set(handle.namelist())
+            if MANIFEST_NAME in names:
+                body = json.loads(
+                    handle.read(MANIFEST_NAME).decode("utf-8")
+                )
+            elif "manifiesto.epyson" in names:
+                body = json.loads(
+                    handle.read("manifiesto.epyson").decode("utf-8")
+                )
+            else:
+                raise ValueError(
+                    f"missing {MANIFEST_NAME} or manifiesto.epyson"
+                )
     except (OSError, KeyError, ValueError, zipfile.BadZipFile) as exc:
         raise ValueError(
             f"{archive.name} is not a readable .zepy: {exc}"
         ) from exc
-    if not isinstance(body, dict) or body.get("format") != "zepy":
+    if not isinstance(body, dict):
+        raise ValueError(f"{archive.name} does not contain a manifest")
+    if body.get("format") not in {None, "zepy"}:
         raise ValueError(f"{archive.name} does not contain a zepy manifest")
     return body
 
@@ -217,3 +232,17 @@ def open_folder(path: str | Path) -> Path:
     if folder.is_dir() and any(folder.iterdir()):
         return folder
     return unpack(archive, folder)
+
+
+def first_markdown(path: str | Path) -> Path:
+    """Materialise a package and return its main Markdown document."""
+    folder = open_folder(path)
+    candidates = sorted(folder.rglob("*.md"))
+    if not candidates:
+        raise ValueError(f"{Path(path).name} contains no Markdown document")
+    preferred = ("seguimiento.md", "report.md", "demo.md", "README.md")
+    by_name = {item.name: item for item in candidates}
+    for name in preferred:
+        if name in by_name:
+            return by_name[name]
+    return candidates[0]

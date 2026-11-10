@@ -41,13 +41,14 @@ class AppHeader(QWidget):
     ) -> None:
         super().__init__(parent)
         self.setObjectName("AppHeader")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(18, 10, 18, 10)
-        layout.setSpacing(12)
+        layout.setContentsMargins(14, 8, 14, 8)
+        layout.setSpacing(10)
 
         self.logo = QLabel(self)
         self.logo.setObjectName("AppHeaderLogo")
-        self.logo.setFixedSize(42, 42)
+        self.logo.setFixedSize(36, 36)
         self.logo.setAccessibleName(title)
         self._set_logo(logo_path, title)
         layout.addWidget(self.logo)
@@ -100,6 +101,13 @@ class AppHeader(QWidget):
             layout.addWidget(assistant)
             self._assistant_button = assistant
 
+    def set_texts(self, title: str, subtitle: str = "") -> None:
+        """Update the identity text without rebuilding the header."""
+        self.title.setText(title)
+        self.title.setAccessibleName(title)
+        self.logo.setAccessibleName(title)
+        self.subtitle.setText(subtitle)
+
     def set_language(self, language: str) -> None:
         """Retranslate the header buttons without rebuilding them."""
         labels = _labels(language)
@@ -120,7 +128,7 @@ class AppHeader(QWidget):
         path = Path(logo_path) if logo_path else None
         if path is not None and path.is_file():
             icon = QIcon(str(path))
-            pixmap = icon.pixmap(42, 42)
+            pixmap = icon.pixmap(36, 36)
             if not pixmap.isNull():
                 self.logo.setPixmap(pixmap)
                 return

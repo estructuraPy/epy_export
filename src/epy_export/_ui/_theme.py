@@ -99,13 +99,16 @@ PALETTES: dict[str, Theme] = {
         "on_primary": "#ffffff",
     },
     "craft": {
-        "primary": "#0b1b3a",
-        "accent": "#1d5fd1",
+        # ArtCraft's brand teal, cyan and a cool paper surface. The
+        # document layouts keep their own colours; this palette paints
+        # only the application chrome around them.
+        "primary": "#0b6f88",
+        "accent": "#14a3c7",
         "surface": "#ffffff",
-        "surface_alt": "#e9eef6",
-        "text": "#0f172a",
-        "muted": "#475569",
-        "border": "#7c8da8",
+        "surface_alt": "#eef7fa",
+        "text": "#0b1b2a",
+        "muted": "#4b6472",
+        "border": "#9fbac6",
         "on_primary": "#ffffff",
     },
     "handwritten": {
@@ -159,14 +162,14 @@ PALETTES: dict[str, Theme] = {
         "on_primary": "#ffffff",
     },
     "craft_dark": {
-        "primary": "#e3ebff",
-        "accent": "#7aa7ff",
-        "surface": "#111827",
-        "surface_alt": "#0d1728",
-        "text": "#f1f5fb",
-        "muted": "#b4c2d7",
-        "border": "#3a4c68",
-        "on_primary": "#0b1b3a",
+        "primary": "#8ed8ec",
+        "accent": "#14a3c7",
+        "surface": "#0d1b22",
+        "surface_alt": "#122832",
+        "text": "#f1f8fa",
+        "muted": "#a8c0c9",
+        "border": "#31515f",
+        "on_primary": "#06232c",
     },
 }
 """Theme name -> colour table. The names are the standard layout names."""
@@ -552,7 +555,17 @@ QPushButton#Primary:hover {{
     background: {accent};
     border-color: {accent};
 }}
-
+QPushButton#Primary:disabled {{
+    background: {surface_alt};
+    color: {muted};
+    border-color: {border};
+}}
+QPushButton:focus, QToolButton:focus {{
+    border: 2px solid {accent};
+}}
+QToolButton:disabled {{
+    color: {muted};
+}}
 QToolBar {{
     background: {surface};
     border: none;

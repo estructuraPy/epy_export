@@ -32,6 +32,7 @@ from ..._core._backends import (
     backend_route,
     load_backend,
 )
+from ..._core._frontmatter import strip_front_matter
 from .._contract._engine import Engine, RenderOptions
 
 __all__ = ["emit_all", "refuse_latex_errors", "understands"]
@@ -226,9 +227,23 @@ def _job(
              "execute_code_blocks": False},
         ))
     else:
+        # The Markdown reader keeps a leading YAML block as literal text.
+        # Strip it in a staged copy so a report's front matter does not
+        # print at the top of the rendered document.
+        source_path = source
+        try:
+            original = source.read_text(encoding="utf-8")
+        except OSError:
+            original = ""
+        body = strip_front_matter(original)
+        if body != original:
+            staged = output_dir / "_staged" / source.name
+            staged.parent.mkdir(parents=True, exist_ok=True)
+            staged.write_text(body, encoding="utf-8", newline="\n")
+            source_path = staged
         steps.append((
             "add_markdown_file",
-            {"file_path": str(source), "convert_tables": False},
+            {"file_path": str(source_path), "convert_tables": False},
         ))
 
     generate: dict[str, Any] = {
