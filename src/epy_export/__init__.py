@@ -154,6 +154,7 @@ __all__ = [
     "understood_by",
     "wait_until",
     "write_text_atomic",
+    "zepy",
 ]
 
 #: Qt is NOT imported when this package is. Every consuming library calls
@@ -176,3 +177,6 @@ def __getattr__(name: str) -> object:
 
         return getattr(docs_export_dialog, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+from . import zepy  # noqa: E402,F401 - public package module
